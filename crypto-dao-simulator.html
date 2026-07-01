@@ -99,6 +99,12 @@
   }
   .btn-del:hover{background:#ffe3e8;}
 
+  .chart-wrap{margin-top:18px;}
+  .chart-legend{font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:600;}
+  .legend-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;}
+  .chart-svg{width:100%;height:auto;display:block;background:var(--card2);border-radius:14px;border:1px solid var(--border);}
+  .chart-svg text{font-family:"Segoe UI",Meiryo,sans-serif;}
+
   .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
   .table-scroll table{min-width:480px;}
 
@@ -270,6 +276,15 @@
 
     <div class="result-row"><span class="label">割引反映後の実質投資元本（開始残高）</span><span class="val" id="effectivePrincipal">$0</span></div>
 
+    <div class="chart-wrap">
+      <div class="chart-legend">
+        <span class="legend-dot" style="background:var(--accent);"></span>残高（税引前）
+        <span class="legend-dot" style="background:#00a186;margin-left:16px;"></span>手取り（税引後）
+      </div>
+      <svg id="card2Chart" class="chart-svg" viewBox="0 0 640 260" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="footnote" style="margin-top:2px;">※ 縦軸は対数目盛りです（桁数が大きく変わるため、目盛り間隔は「10倍」ごとになっています）。</div>
+    </div>
+
     <div class="table-scroll">
       <table>
         <thead>
@@ -326,6 +341,14 @@
         <div class="val" id="logRateHeadline">-</div>
       </div>
 
+      <div class="chart-wrap">
+        <div class="chart-legend">
+          <span class="legend-dot" style="background:var(--accent2);"></span>実際の記録
+          <span class="legend-dot" style="background:var(--pink);margin-left:16px;"></span>この成長率での延長予測
+        </div>
+        <svg id="card3Chart" class="chart-svg" viewBox="0 0 640 260" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+
       <div class="table-scroll">
         <table style="margin-top:14px;">
           <thead><tr><th style="text-align:left;">この成長率が続いた場合</th><th>予測残高（USD）</th><th>円換算</th></tr></thead>
@@ -353,6 +376,99 @@ function fmtJPY(n){
 function fmtUSD(n){
   if(!isFinite(n)) return "-";
   return "$" + n.toLocaleString("en-US",{maximumFractionDigits:0});
+}
+
+function niceNumber(x){
+  if(x<=0 || !isFinite(x)) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(x)));
+  const res = x / mag;
+  const niceRes = res < 1.5 ? 1 : res < 3 ? 2 : res < 7 ? 5 : 10;
+  return niceRes * mag;
+}
+function niceLinearTicks(min, max, count){
+  if(max <= min) return [min];
+  const step = niceNumber((max - min) / count);
+  const start = Math.ceil(min / step) * step;
+  const ticks = [];
+  for(let v = start; v <= max + step*0.001; v += step) ticks.push(v);
+  return ticks.length ? ticks : [min, max];
+}
+
+function drawLineChart(svgId, series, opts){
+  const svg = document.getElementById(svgId);
+  if(!svg) return;
+  const W = 640, H = 260;
+  const padL = 58, padR = 12, padT = 14, padB = 28;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+
+  let allPts = [];
+  series.forEach(s => allPts = allPts.concat(s.points));
+  if(!allPts.length){ svg.innerHTML = ""; return; }
+
+  const xs = allPts.map(p=>p[0]);
+  let ys = allPts.map(p=>p[1]).filter(v => isFinite(v) && v > 0);
+  if(!ys.length) ys = [1];
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  let yMin = Math.min(...ys), yMax = Math.max(...ys);
+  if(opts.logScale){
+    yMin = Math.pow(10, Math.floor(Math.log10(Math.max(yMin,0.01))));
+    yMax = Math.pow(10, Math.ceil(Math.log10(Math.max(yMax,yMin*10))));
+  } else {
+    const pad = (yMax - yMin) * 0.08 || Math.abs(yMax)*0.1 || 1;
+    yMin = yMin - pad; yMax = yMax + pad;
+  }
+
+  const scaleX = x => padL + (xMax>xMin ? (x-xMin)/(xMax-xMin) : 0.5) * innerW;
+  const scaleY = y => {
+    const yy = Math.max(y, opts.logScale ? yMin : y);
+    if(opts.logScale){
+      const t = (Math.log10(yy)-Math.log10(yMin)) / (Math.log10(yMax)-Math.log10(yMin) || 1);
+      return padT + (1-t) * innerH;
+    }
+    const t = (yy-yMin)/((yMax-yMin)||1);
+    return padT + (1-t) * innerH;
+  };
+
+  let svgContent = "";
+
+  // horizontal gridlines
+  let yTicks = [];
+  if(opts.logScale){
+    const lo = Math.round(Math.log10(yMin)), hi = Math.round(Math.log10(yMax));
+    let step = 1;
+    if(hi - lo > 7) step = Math.ceil((hi-lo)/7);
+    for(let p=lo; p<=hi; p+=step) yTicks.push(Math.pow(10,p));
+  } else {
+    yTicks = niceLinearTicks(yMin, yMax, 4);
+  }
+  yTicks.forEach(v => {
+    const y = scaleY(v);
+    svgContent += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--border)" stroke-width="1"/>`;
+    svgContent += `<text x="${padL-8}" y="${y+3}" font-size="10" fill="var(--sub)" text-anchor="end">${opts.yFormatter ? opts.yFormatter(v) : v}</text>`;
+  });
+
+  // vertical gridlines
+  const xTickCount = 5;
+  for(let i=0;i<=xTickCount;i++){
+    const xv = xMin + (xMax-xMin) * i/xTickCount;
+    const x = scaleX(xv);
+    svgContent += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${H-padB}" stroke="var(--border)" stroke-width="1"/>`;
+    svgContent += `<text x="${x}" y="${H-padB+16}" font-size="10" fill="var(--sub)" text-anchor="middle">${opts.xFormatter ? opts.xFormatter(xv) : Math.round(xv)}</text>`;
+  }
+
+  // series
+  series.forEach(s => {
+    const pathPts = s.points.map(p => `${scaleX(p[0])},${scaleY(p[1])}`).join(" ");
+    const dash = s.dashed ? `stroke-dasharray="6,5"` : "";
+    svgContent += `<polyline points="${pathPts}" fill="none" stroke="${s.color}" stroke-width="2.5" ${dash} stroke-linejoin="round" stroke-linecap="round"/>`;
+    if(s.dots){
+      s.points.forEach(p => {
+        svgContent += `<circle cx="${scaleX(p[0])}" cy="${scaleY(p[1])}" r="3.5" fill="${s.color}"/>`;
+      });
+    }
+  });
+
+  svg.innerHTML = svgContent;
 }
 
 function recalcCard1(){
@@ -451,13 +567,8 @@ function recalcCard2(){
   const effRate = rebaseRate * (1 - stress/100);
   const releaseTax = releaseTaxFor(releaseDays);
 
-  const checkpoints = [30,90,180,270,365,540,730].filter(d => d <= Math.max(simDays,30));
-  if(!checkpoints.includes(simDays) && simDays>0) checkpoints.push(simDays);
-  checkpoints.sort((a,b)=>a-b);
-
-  const rows = checkpoints.map(days => {
+  function balanceAtDay(days){
     let balance;
-
     if(growthModel === 'anchor'){
       balance = principal * anchorMultiplier(days, stress/100);
     } else {
@@ -469,7 +580,15 @@ function recalcCard2(){
         balance = (principal + profitAt540 + bonusAmount) * Math.pow(1 + effRate, 2*daysAfter540);
       }
     }
+    return balance;
+  }
 
+  const checkpoints = [30,90,180,270,365,540,730].filter(d => d <= Math.max(simDays,30));
+  if(!checkpoints.includes(simDays) && simDays>0) checkpoints.push(simDays);
+  checkpoints.sort((a,b)=>a-b);
+
+  const rows = checkpoints.map(days => {
+    const balance = balanceAtDay(days);
     const net = balance * (1 - releaseTax) * (1 - sellTax);
     const netJpy = net * fx;
     return {days, balance, net, netJpy};
@@ -483,6 +602,21 @@ function recalcCard2(){
     tr.innerHTML = `<td>${monthLabel}</td><td class="gross">${fmtUSD(r.balance)}</td><td class="net">${fmtUSD(r.net)}</td><td>${fmtJPY(r.netJpy)}</td>`;
     tbody.appendChild(tr);
   });
+
+  const chartN = 90;
+  const grossPts = [], netPts = [];
+  for(let i=0;i<=chartN;i++){
+    const d = simDays * i / chartN;
+    const bal = Math.max(balanceAtDay(d), 0.01);
+    const net = Math.max(bal * (1 - releaseTax) * (1 - sellTax), 0.01);
+    grossPts.push([d, bal]);
+    netPts.push([d, net]);
+  }
+  const dayTickFmt = d => d>=365 ? Math.round(d/365*10)/10 + "年" : Math.round(d) + "日";
+  drawLineChart('card2Chart', [
+    {points: grossPts, color: 'var(--accent)'},
+    {points: netPts, color: '#00a186'}
+  ], {logScale:true, xFormatter: dayTickFmt, yFormatter: v => fmtUSD(v)});
 }
 
 function recalcAll(){ recalcCard1(); recalcCard2(); }
@@ -572,6 +706,25 @@ function computeLogProjection(entries){
     tr.innerHTML = `<td style="text-align:left;">${label}</td><td>${fmtUSD(val)}</td><td>${fmtJPY(val*fx)}</td>`;
     projBody.appendChild(tr);
   });
+
+  const firstDate = new Date(entries[0].date);
+  const dayOffset = dt => Math.round((new Date(dt) - firstDate) / 86400000);
+  const actualPts = entries.map(e => [dayOffset(e.date), e.balance]);
+  const lastDay = dayOffset(last.date);
+  const projPts = [];
+  const projSteps = 20;
+  for(let i=0;i<=projSteps;i++){
+    const d = lastDay + (365 * i / projSteps);
+    projPts.push([d, last.balance * Math.pow(1+dailyRate, d-lastDay)]);
+  }
+  const dateFmt = d => {
+    const dt = new Date(firstDate.getTime() + d*86400000);
+    return (dt.getMonth()+1) + "/" + dt.getDate();
+  };
+  drawLineChart('card3Chart', [
+    {points: actualPts, color: 'var(--accent2)', dots:true},
+    {points: projPts, color: 'var(--pink)', dashed:true}
+  ], {logScale:false, xFormatter: dateFmt, yFormatter: v => fmtUSD(v)});
 }
 
 document.getElementById('addLogBtn').addEventListener('click', () => {
