@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto DAO 資産運用シミュレーター（個人用）</title>
+<style>
+  :root{
+    --bg1:#fff1f8; --bg2:#eef2ff; --bg3:#eafffb;
+    --card:#ffffff; --card2:#f7f5ff; --border:#efe9fb;
+    --text:#332b4d; --sub:#8b83a8; --accent:#7c5cff; --accent2:#00c9a7;
+    --pink:#ff5da2; --yellow:#ffb703; --danger:#ff5d7a; --input-bg:#faf9ff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:"Segoe UI","Hiragino Maru Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    background:
+      radial-gradient(circle at 10% 0%, var(--bg1) 0%, transparent 45%),
+      radial-gradient(circle at 90% 10%, var(--bg3) 0%, transparent 45%),
+      linear-gradient(160deg, var(--bg2), #fff8f0 60%, var(--bg1));
+    background-attachment:fixed;
+    color:var(--text); padding:28px 16px 70px;
+  }
+  .wrap{max-width:960px;margin:0 auto;}
+  h1{font-size:24px;margin:0 0 6px;font-weight:800;}
+  .subtitle{color:var(--sub);font-size:13.5px;margin-bottom:22px;}
+  .notice{
+    background:linear-gradient(135deg,#fff4d6,#ffe9ec);border:1.5px solid #ffdca3;color:#8a6300;
+    padding:12px 16px;border-radius:16px;font-size:12.5px;line-height:1.7;margin-bottom:24px;
+    box-shadow:0 4px 14px rgba(255,183,3,0.15);
+  }
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:22px;
+    padding:22px 24px;margin-bottom:24px;
+    box-shadow:0 10px 30px rgba(124,92,255,0.08), 0 2px 8px rgba(0,0,0,0.03);
+    border-top:5px solid var(--accent);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .card:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(124,92,255,0.14), 0 2px 8px rgba(0,0,0,0.04);}
+  .card-2{border-top-color:var(--pink);}
+  .card-3{border-top-color:var(--accent2);}
+  .card h2{font-size:17px;margin:0 0 4px;color:var(--accent);font-weight:800;}
+  .card-2 h2{color:var(--pink);}
+  .card-3 h2{color:#00a186;}
+  .card .desc{color:var(--sub);font-size:12.5px;margin-bottom:18px;line-height:1.6;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;}
+  label{display:block;font-size:12.5px;color:var(--sub);margin-bottom:5px;font-weight:600;}
+  input[type=number], input[type=text], input[type=date], select{
+    width:100%;padding:10px 12px;background:var(--input-bg);border:2px solid var(--border);
+    border-radius:12px;color:var(--text);font-size:14px;transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  input[type=number]:focus, input[type=text]:focus, input[type=date]:focus, select:focus{
+    outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,0.15);
+  }
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  .field{margin-bottom:2px;}
+  details{margin-top:14px;}
+  details summary{cursor:pointer;color:var(--accent);font-size:12.5px;margin-bottom:10px;font-weight:700;}
+  .result-row{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:11px 4px;border-bottom:1px dashed var(--border);font-size:13.5px;
+  }
+  .result-row:last-child{border-bottom:none;}
+  .result-row .label{color:var(--sub);}
+  .result-row .val{font-weight:700;}
+  .total-box{
+    margin-top:16px;background:linear-gradient(120deg,#f3efff,#fff0f7);border:1.5px solid #ecdcff;
+    border-radius:18px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;
+    flex-wrap:wrap;gap:8px;
+  }
+  .total-box .label{font-size:13px;color:var(--sub);font-weight:600;}
+  .total-box .val{font-size:24px;font-weight:800;color:var(--accent);}
+  .total-box .sub-val{font-size:12px;color:var(--sub);margin-top:2px;}
+  table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px;}
+  th,td{padding:9px 6px;text-align:right;border-bottom:1px solid var(--border);}
+  th:first-child,td:first-child{text-align:left;color:var(--sub);}
+  th{color:var(--sub);font-weight:700;font-size:12px;}
+  tbody tr:hover{background:#faf8ff;}
+  td.gross{color:var(--text);}
+  td.net{color:#00a186;font-weight:700;}
+  .range-row{display:flex;align-items:center;gap:10px;}
+  .range-row output{min-width:46px;text-align:right;font-size:13px;color:var(--accent);font-weight:700;}
+  .footnote{font-size:11.5px;color:var(--sub);margin-top:14px;line-height:1.8;}
+  .badge{
+    display:inline-block;font-size:11px;padding:4px 12px;border-radius:20px;
+    background:linear-gradient(120deg,var(--accent),var(--pink));color:#fff;margin-left:8px;
+    font-weight:700;vertical-align:middle;
+  }
+  .btn{
+    width:100%;padding:11px 14px;background:linear-gradient(120deg,var(--accent),var(--pink));
+    color:#fff;border:none;border-radius:14px;font-size:13.5px;font-weight:800;cursor:pointer;
+    box-shadow:0 6px 16px rgba(124,92,255,0.3);transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(124,92,255,0.4);}
+  .btn:active{transform:translateY(0);}
+  .btn-del{
+    background:#fff0f2;border:1.5px solid #ffd3db;color:var(--danger);
+    border-radius:10px;font-size:11px;padding:4px 10px;cursor:pointer;font-weight:700;
+  }
+  .btn-del:hover{background:#ffe3e8;}
+
+  .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .table-scroll table{min-width:480px;}
+
+  .log-form-grid{grid-template-columns:1fr 1fr 1.4fr auto;align-items:end;}
+
+  @media (max-width:640px){
+    body{padding:16px 10px 50px;}
+    h1{font-size:19px;}
+    .subtitle{font-size:12.5px;margin-bottom:16px;}
+    .notice{padding:10px 12px;border-radius:14px;font-size:12px;}
+    .card{padding:16px 14px;border-radius:18px;margin-bottom:16px;}
+    .card h2{font-size:15px;}
+    .card .desc{font-size:12px;margin-bottom:14px;}
+    .grid{grid-template-columns:1fr;gap:12px;}
+    .log-form-grid{grid-template-columns:1fr;}
+    input[type=number], input[type=text], input[type=date], select{font-size:16px;padding:11px 12px;}
+    .total-box{flex-direction:column;align-items:flex-start;padding:14px 16px;}
+    .total-box .val{font-size:21px;}
+    .table-scroll table{min-width:0;font-size:12px;}
+    th,td{padding:7px 5px;}
+    .btn{padding:13px 14px;font-size:14px;}
+    .badge{display:block;margin-left:0;margin-top:8px;width:fit-content;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🚀 Crypto DAO 資産運用シミュレーター <span class="badge">✨ 個人用・自己計算ツール</span></h1>
+  <div class="subtitle">自分のステーク状況から見込み月利を計算し、複利再投資した場合の中長期の推移を試算します。</div>
+
+  <div class="notice">
+    ⚠ これは入力した前提（リベース率・税率・レート）に基づく<strong>試算ツール</strong>です。将来の利率・税制・トークン価格を保証するものではなく、プロトコルの状況によって数値が変動・低下する可能性があります。実際の受取額とは差異が出ます。定期的に実績と照らし合わせてパラメータを調整してください。
+  </div>
+
+  <!-- ================= CARD 1: 現在の月利計算 ================= -->
+  <div class="card card-1">
+    <h2>💰 ① 現在の見込み月利（JPY）</h2>
+    <div class="desc">現在保有しているステーク/ボンド/報酬実績から、今のレートのまま30日回った場合の見込み月利を計算します。</div>
+
+    <div class="grid">
+      <div class="field">
+        <label>① ステーキング数量（合計）</label>
+        <input type="number" id="stakeQty" value="0" min="0" step="any">
+      </div>
+      <div class="field">
+        <label>② LPボンド／債権バーン 数量（合計）</label>
+        <input type="number" id="bondQty" value="0" min="0" step="any">
+      </div>
+      <div class="field">
+        <label>③ コミュニティ＆ランク報酬 受取実績（合計）</label>
+        <input type="number" id="commRewardSum" value="0" min="0" step="any">
+      </div>
+    </div>
+
+    <details>
+      <summary>詳細パラメータ（レート・単価が変わったらここを調整）</summary>
+      <div class="grid">
+        <div class="field">
+          <label>基礎レート係数</label>
+          <input type="number" id="baseRate" value="0.04" step="any">
+        </div>
+        <div class="field">
+          <label>ボンド倍率</label>
+          <input type="number" id="bondMultiplier" value="1.45" step="any">
+        </div>
+        <div class="field">
+          <label>係数A（秒定数①）</label>
+          <input type="number" id="factorA" value="60" step="any">
+        </div>
+        <div class="field">
+          <label>係数B（秒定数②）</label>
+          <input type="number" id="factorB" value="60" step="any">
+        </div>
+        <div class="field">
+          <label>トークン単価（JPY）</label>
+          <input type="number" id="priceJPY" value="162" step="any">
+        </div>
+        <div class="field">
+          <label>為替レート（JPY / USD）</label>
+          <input type="number" id="fxRate" value="155" step="any">
+        </div>
+      </div>
+    </details>
+
+    <div style="margin-top:18px;">
+      <div class="result-row"><span class="label">① ステーキング報酬 月利見込み</span><span class="val" id="r1">¥0</span></div>
+      <div class="result-row"><span class="label">② LPボンド＆債権バーン 月利見込み</span><span class="val" id="r2">¥0</span></div>
+      <div class="result-row"><span class="label">③ コミュニティ＆ランク報酬 月利見込み</span><span class="val" id="r3">¥0</span></div>
+    </div>
+
+    <div class="total-box">
+      <div>
+        <div class="label">合計 見込み月利（30日後想定・現状レート固定）</div>
+        <div class="sub-val" id="totalUsd">≈ $0</div>
+      </div>
+      <div class="val" id="totalJpy">¥0</div>
+    </div>
+  </div>
+
+  <!-- ================= CARD 2: 長期複利シミュレーション ================= -->
+  <div class="card card-2">
+    <h2>📈 ② 長期複利シミュレーション（全額再投資）</h2>
+    <div class="desc">初期入金額をベースに、リベースを複利で回し続けた場合の残高推移と、出金時の税引き後手取りを試算します。</div>
+
+    <div class="grid">
+      <div class="field">
+        <label>初期入金額（USD）</label>
+        <input type="number" id="principal" value="3000" step="any">
+      </div>
+      <div class="field">
+        <label>ボンド購入前提（最大期間で購入した場合の割引を反映）</label>
+        <select id="bondPreset">
+          <option value="0">割引なし（通常ステーキングのみ）</option>
+          <option value="10">180日ボンド（割引10%・実績期間利回り419.02%相当）</option>
+          <option value="15" selected>360日ボンド（割引15%・実績期間利回り2,346.21%相当）</option>
+          <option value="custom">カスタム割引率</option>
+        </select>
+      </div>
+      <div class="field" id="customDiscountWrap" style="display:none;">
+        <label>カスタム割引率（%）</label>
+        <input type="number" id="customDiscount" value="15" step="any">
+      </div>
+      <div class="field">
+        <label>成長モデル</label>
+        <select id="growthModel">
+          <option value="anchor" selected>実績アンカーベース（540日ステーキングの実績期間利回りから算出）</option>
+          <option value="manual">手動レート入力（自分でリベース率を指定）</option>
+        </select>
+      </div>
+      <div class="field" id="manualRateWrap" style="display:none;">
+        <label>リベース率（% / 12時間）</label>
+        <input type="number" id="rebaseRate" value="0.44" step="any">
+      </div>
+      <div class="field" id="manualBonusWrap" style="display:none;">
+        <label>540日プラン 固定ボーナス（手動モード用）</label>
+        <select id="bonusEnabled">
+          <option value="0">なし</option>
+          <option value="1" selected>あり（540日到達時 +45%を利益部分に加算）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>シミュレーション期間（日）</label>
+        <input type="number" id="simDays" value="730" step="1">
+      </div>
+      <div class="field">
+        <label>出金リリース日数（税率に影響）</label>
+        <select id="releaseDays">
+          <option value="7">7日（税率 約15%）</option>
+          <option value="14">14日（税率 約12%）</option>
+          <option value="21">21日（税率 約8%）</option>
+          <option value="28">28日（税率 約5%）</option>
+          <option value="35">35日（税率 約3%）</option>
+          <option value="45">45日（税率 約1%）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>売却税（%）</label>
+        <input type="number" id="sellTax" value="2.5" step="any">
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <label>ストレステスト：想定レートを下げて試算する（自動ブレーキ・利率低下シナリオ）</label>
+      <div class="range-row">
+        <input type="range" id="stress" min="0" max="90" value="0" step="5">
+        <output id="stressOut">0%</output>
+      </div>
+    </div>
+
+    <div class="result-row"><span class="label">割引反映後の実質投資元本（開始残高）</span><span class="val" id="effectivePrincipal">$0</span></div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>経過</th><th>残高（税引前）</th><th>手取り想定（税引後）</th><th>円換算（手取り）</th></tr>
+        </thead>
+        <tbody id="projTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="footnote">
+      ※ 手取り想定 = 残高 ×（1 − 出金リリース税率）×（1 − 売却税）で計算しています。<br>
+      ※ ボンド割引は「入金額 ÷（1 − 割引率）」を開始残高として一度だけ反映しています。ボンド満期ごとに再度割引を得て乗り換える前提までは織り込んでいません。<br>
+      ※ 「実績アンカーベース」モデルは、実際のステーキング画面で確認された期間利回り（1日0.80%／30日28.24%／90日112.23%／180日341.99%／360日1,753.72%／540日7,524.42%）を通る曲線（対数線形補間）で残高を計算しています。540日を超える期間は「満期の都度、同条件の540日ステーキングに乗り換える（ロールオーバー）」前提で540日サイクルを繰り返します。<br>
+      ※ 「手動レート入力」モードは旧来の簡易近似（リベース率の複利計算＋540日到達時に含み益へ+45%を一括加算）です。実績アンカーベースの方が実データに近いため、通常はそちらを推奨します。<br>
+      ※ ストレステストは「レートが今より○%下がり続けた場合」の下振れ確認用です。実績アンカーベースでは累積倍率の対数を割り引く形で反映しています。0%＝現状カーブ据え置きの試算です。
+    </div>
+  </div>
+
+  <!-- ================= CARD 3: 実績トラッキング ================= -->
+  <div class="card card-3">
+    <h2>📝 ③ 実績トラッキング（自分の記録から将来予測）</h2>
+    <div class="desc">アプリを見るたびに「日付」と「その時点の残高（USD）」を記録するだけです。途中で引き出しても、残高が実際どう動いたかがそのまま反映されるので、内部の計算式を推測する必要はありません。記録はこのブラウザに自動保存されます。</div>
+
+    <div class="grid log-form-grid">
+      <div class="field"><label>日付</label><input type="date" id="logDate"></div>
+      <div class="field"><label>残高（USD）</label><input type="number" id="logBalance" step="any" placeholder="例: 12500"></div>
+      <div class="field"><label>メモ（任意）</label><input type="text" id="logNote" placeholder="例: 出金$500済み／全額再投資 など"></div>
+      <div class="field"><button id="addLogBtn" class="btn">記録を追加</button></div>
+    </div>
+
+    <div class="table-scroll">
+      <table id="logTable" style="margin-top:16px;">
+        <thead><tr><th style="text-align:left;">日付</th><th>残高（USD）</th><th style="text-align:left;">メモ</th><th>間隔からの実質日利</th><th></th></tr></thead>
+        <tbody id="logTableBody"></tbody>
+      </table>
+    </div>
+    <div class="footnote" id="logEmptyMsg">まだ記録がありません。上のフォームから2件以上入力すると、実質成長率と将来予測が表示されます。</div>
+
+    <div id="logSummaryWrap" style="display:none;">
+      <div class="grid" style="margin-top:16px;">
+        <div class="field">
+          <label>予測に使う成長率の基準</label>
+          <select id="logBasis">
+            <option value="last" selected>直近の記録区間（今の引き出しペースを反映）</option>
+            <option value="all">記録の最初〜最後の平均</option>
+          </select>
+        </div>
+      </div>
+      <div class="total-box">
+        <div>
+          <div class="label">実質成長率（記録ベース・複利換算）</div>
+          <div class="sub-val" id="logRateDetail"></div>
+        </div>
+        <div class="val" id="logRateHeadline">-</div>
+      </div>
+
+      <div class="table-scroll">
+        <table style="margin-top:14px;">
+          <thead><tr><th style="text-align:left;">この成長率が続いた場合</th><th>予測残高（USD）</th><th>円換算</th></tr></thead>
+          <tbody id="logProjBody"></tbody>
+        </table>
+      </div>
+
+      <div class="footnote">
+        ※ 「実質日利」は前回記録からの経過日数と残高の変化から逆算した複利ベースの日利です。出金・追加入金・レート変動をすべて含んだ「結果としての伸び」なので、内部の仕組みを理解していなくても実態に近い予測ができます。<br>
+        ※ 予測は選択した区間の成長率がそのまま続くと仮定した単純延長です。出金ペースや相場が変われば当然変わります。
+      </div>
+    </div>
+  </div>
+
+  <div class="footnote" style="text-align:center;">
+    数値は自己入力パラメータに基づく試算であり、投資助言ではありません。プロトコルの状況（トレジャリー残高・レート改定・出金制限など）により実際の結果は変動します。
+  </div>
+</div>
+
+<script>
+function fmtJPY(n){
+  if(!isFinite(n)) return "-";
+  return "¥" + Math.round(n).toLocaleString("ja-JP");
+}
+function fmtUSD(n){
+  if(!isFinite(n)) return "-";
+  return "$" + n.toLocaleString("en-US",{maximumFractionDigits:0});
+}
+
+function recalcCard1(){
+  const stakeQty = parseFloat(document.getElementById('stakeQty').value) || 0;
+  const bondQty = parseFloat(document.getElementById('bondQty').value) || 0;
+  const commSum = parseFloat(document.getElementById('commRewardSum').value) || 0;
+
+  const baseRate = parseFloat(document.getElementById('baseRate').value) || 0;
+  const bondMult = parseFloat(document.getElementById('bondMultiplier').value) || 0;
+  const fA = parseFloat(document.getElementById('factorA').value) || 0;
+  const fB = parseFloat(document.getElementById('factorB').value) || 0;
+  const price = parseFloat(document.getElementById('priceJPY').value) || 0;
+  const fx = parseFloat(document.getElementById('fxRate').value) || 1;
+
+  const r1 = stakeQty * baseRate * fA * fB * price;
+  const r2 = bondQty * baseRate * bondMult * fA * fB * price;
+  const r3 = commSum * fA * fB * price;
+  const total = r1 + r2 + r3;
+
+  document.getElementById('r1').textContent = fmtJPY(r1);
+  document.getElementById('r2').textContent = fmtJPY(r2);
+  document.getElementById('r3').textContent = fmtJPY(r3);
+  document.getElementById('totalJpy').textContent = fmtJPY(total);
+  document.getElementById('totalUsd').textContent = "≈ " + fmtUSD(total / fx);
+}
+
+function releaseTaxFor(days){
+  // 7日=15% .. 45日=1%、線形補間
+  const d0=7, t0=0.15, d1=45, t1=0.01;
+  const d = Math.min(Math.max(days,d0),d1);
+  return t0 + (t1-t0) * ((d-d0)/(d1-d0));
+}
+
+// 実績ステーキング画面で確認された期間利回りアンカー（日数 -> 累積倍率）
+const STAKE_ANCHORS = [
+  [0, 1],
+  [1, 1.0080],
+  [30, 1.2824],
+  [90, 2.1223],
+  [180, 4.4199],
+  [360, 18.5372],
+  [540, 76.2442]
+];
+const CYCLE_DAYS = 540;
+
+function interpLogLinear(anchors, d){
+  if(d <= 0) return 1;
+  for(let i=0;i<anchors.length-1;i++){
+    const [d0,m0] = anchors[i], [d1,m1] = anchors[i+1];
+    if(d >= d0 && d <= d1){
+      if(d1 === d0) return m1;
+      const t = (d - d0) / (d1 - d0);
+      const logm = Math.log(m0) + t * (Math.log(m1) - Math.log(m0));
+      return Math.exp(logm);
+    }
+  }
+  return anchors[anchors.length-1][1];
+}
+
+function anchorMultiplier(days, stressFrac){
+  const cycles = Math.floor(days / CYCLE_DAYS);
+  const rem = days - cycles * CYCLE_DAYS;
+  const fullCycleM = STAKE_ANCHORS[STAKE_ANCHORS.length-1][1];
+  const remM = interpLogLinear(STAKE_ANCHORS, rem);
+  let raw = Math.pow(fullCycleM, cycles) * remM;
+  if(stressFrac > 0){
+    raw = Math.exp(Math.log(raw) * (1 - stressFrac));
+  }
+  return raw;
+}
+
+function recalcCard2(){
+  const principalInput = parseFloat(document.getElementById('principal').value) || 0;
+  const bondPresetSel = document.getElementById('bondPreset').value;
+  const customDiscount = parseFloat(document.getElementById('customDiscount').value) || 0;
+  document.getElementById('customDiscountWrap').style.display = (bondPresetSel === 'custom') ? '' : 'none';
+  const discountPct = (bondPresetSel === 'custom') ? customDiscount : parseFloat(bondPresetSel);
+  const discountFrac = Math.min(Math.max(discountPct,0),95) / 100;
+  const principal = discountFrac > 0 ? principalInput / (1 - discountFrac) : principalInput;
+
+  const growthModel = document.getElementById('growthModel').value;
+  document.getElementById('manualRateWrap').style.display = (growthModel === 'manual') ? '' : 'none';
+  document.getElementById('manualBonusWrap').style.display = (growthModel === 'manual') ? '' : 'none';
+
+  const rebaseRate = (parseFloat(document.getElementById('rebaseRate').value) || 0) / 100;
+  const simDays = parseInt(document.getElementById('simDays').value) || 0;
+  const releaseDays = parseInt(document.getElementById('releaseDays').value) || 7;
+  const sellTax = (parseFloat(document.getElementById('sellTax').value) || 0) / 100;
+  const bonusEnabled = document.getElementById('bonusEnabled').value === "1";
+  const stress = parseFloat(document.getElementById('stress').value) || 0;
+  const fx = parseFloat(document.getElementById('fxRate').value) || 1;
+
+  document.getElementById('stressOut').textContent = stress + "%";
+  document.getElementById('effectivePrincipal').textContent = fmtUSD(principal) + (discountFrac>0 ? `（入金額 ${fmtUSD(principalInput)} を${discountPct}%割引でボンド購入したと仮定）` : "");
+
+  const effRate = rebaseRate * (1 - stress/100);
+  const releaseTax = releaseTaxFor(releaseDays);
+
+  const checkpoints = [30,90,180,270,365,540,730].filter(d => d <= Math.max(simDays,30));
+  if(!checkpoints.includes(simDays) && simDays>0) checkpoints.push(simDays);
+  checkpoints.sort((a,b)=>a-b);
+
+  const rows = checkpoints.map(days => {
+    let balance;
+
+    if(growthModel === 'anchor'){
+      balance = principal * anchorMultiplier(days, stress/100);
+    } else {
+      balance = principal * Math.pow(1 + effRate, 2 * days);
+      if(bonusEnabled && days >= 540){
+        const profitAt540 = principal * Math.pow(1 + effRate, 2*540) - principal;
+        const bonusAmount = profitAt540 * 0.45;
+        const daysAfter540 = days - 540;
+        balance = (principal + profitAt540 + bonusAmount) * Math.pow(1 + effRate, 2*daysAfter540);
+      }
+    }
+
+    const net = balance * (1 - releaseTax) * (1 - sellTax);
+    const netJpy = net * fx;
+    return {days, balance, net, netJpy};
+  });
+
+  const tbody = document.getElementById('projTableBody');
+  tbody.innerHTML = "";
+  rows.forEach(r => {
+    const monthLabel = (r.days % 30 === 0) ? (r.days/30 + "ヶ月") : (r.days + "日");
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${monthLabel}</td><td class="gross">${fmtUSD(r.balance)}</td><td class="net">${fmtUSD(r.net)}</td><td>${fmtJPY(r.netJpy)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function recalcAll(){ recalcCard1(); recalcCard2(); }
+
+document.querySelectorAll('input, select').forEach(el => {
+  el.addEventListener('input', recalcAll);
+  el.addEventListener('change', recalcAll);
+});
+
+recalcAll();
+
+// ============ CARD 3: 実績トラッキング ============
+const LOG_KEY = 'cdao_sim_log_entries_v1';
+
+function loadLog(){
+  try{
+    const raw = localStorage.getItem(LOG_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function saveLog(entries){
+  localStorage.setItem(LOG_KEY, JSON.stringify(entries));
+}
+
+function renderLog(){
+  const entries = loadLog().slice().sort((a,b)=> new Date(a.date) - new Date(b.date));
+  const tbody = document.getElementById('logTableBody');
+  tbody.innerHTML = "";
+  document.getElementById('logEmptyMsg').style.display = entries.length ? 'none' : '';
+  document.getElementById('logSummaryWrap').style.display = entries.length >= 2 ? '' : 'none';
+
+  entries.forEach((e, idx) => {
+    let rateLabel = "-";
+    if(idx > 0){
+      const prev = entries[idx-1];
+      const days = (new Date(e.date) - new Date(prev.date)) / 86400000;
+      if(days > 0 && prev.balance > 0){
+        const dailyRate = Math.pow(e.balance / prev.balance, 1/days) - 1;
+        rateLabel = (dailyRate*100).toFixed(3) + "%/日";
+      }
+    }
+    const tr = document.createElement('tr');
+    const noteEsc = (e.note || '').replace(/</g,'&lt;');
+    tr.innerHTML = `<td style="text-align:left;">${e.date}</td><td>${fmtUSD(e.balance)}</td><td style="text-align:left;color:var(--sub);">${noteEsc}</td><td>${rateLabel}</td><td></td>`;
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-del';
+    delBtn.textContent = '削除';
+    delBtn.addEventListener('click', () => {
+      const all = loadLog();
+      const pos = all.findIndex(x => x.date===e.date && x.balance===e.balance && x.note===e.note);
+      if(pos>=0){ all.splice(pos,1); saveLog(all); renderLog(); }
+    });
+    tr.lastElementChild.appendChild(delBtn);
+    tbody.appendChild(tr);
+  });
+
+  if(entries.length >= 2){
+    computeLogProjection(entries);
+  }
+}
+
+function computeLogProjection(entries){
+  const basis = document.getElementById('logBasis').value;
+  const last = entries[entries.length-1];
+  let dailyRate;
+  if(basis === 'all'){
+    const first = entries[0];
+    const days = (new Date(last.date) - new Date(first.date)) / 86400000;
+    dailyRate = days > 0 ? Math.pow(last.balance/first.balance, 1/days) - 1 : 0;
+  } else {
+    const prev = entries[entries.length-2];
+    const days = (new Date(last.date) - new Date(prev.date)) / 86400000;
+    dailyRate = days > 0 ? Math.pow(last.balance/prev.balance, 1/days) - 1 : 0;
+  }
+
+  const fx = parseFloat(document.getElementById('fxRate').value) || 1;
+  document.getElementById('logRateHeadline').textContent = (dailyRate*100).toFixed(3) + "%/日";
+  const monthlyEquiv = (Math.pow(1+dailyRate,30)-1)*100;
+  document.getElementById('logRateDetail').textContent = `月利換算 約${monthlyEquiv.toFixed(1)}%（最終記録 ${last.date} 時点の残高 ${fmtUSD(last.balance)} を起点に延長）`;
+
+  const projBody = document.getElementById('logProjBody');
+  projBody.innerHTML = "";
+  [30,90,180,365].forEach(d => {
+    const val = last.balance * Math.pow(1+dailyRate, d);
+    const tr = document.createElement('tr');
+    const label = d===30?"1ヶ月後": d===90?"3ヶ月後": d===180?"6ヶ月後":"12ヶ月後";
+    tr.innerHTML = `<td style="text-align:left;">${label}</td><td>${fmtUSD(val)}</td><td>${fmtJPY(val*fx)}</td>`;
+    projBody.appendChild(tr);
+  });
+}
+
+document.getElementById('addLogBtn').addEventListener('click', () => {
+  const date = document.getElementById('logDate').value;
+  const balance = parseFloat(document.getElementById('logBalance').value);
+  const note = document.getElementById('logNote').value;
+  if(!date || !isFinite(balance)){ return; }
+  const entries = loadLog();
+  entries.push({date, balance, note});
+  saveLog(entries);
+  document.getElementById('logBalance').value = '';
+  document.getElementById('logNote').value = '';
+  renderLog();
+});
+
+document.getElementById('logBasis').addEventListener('change', renderLog);
+
+const logDateEl = document.getElementById('logDate');
+if(logDateEl && !logDateEl.value){ logDateEl.valueAsDate = new Date(); }
+
+renderLog();
+</script>
+</body>
+</html>
