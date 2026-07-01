@@ -215,22 +215,11 @@
         <input type="number" id="principal" value="3000" step="any">
       </div>
       <div class="field">
-        <label>ボンド購入前提（最大期間で購入した場合の割引を反映）</label>
-        <select id="bondPreset">
-          <option value="0">割引なし（通常ステーキングのみ）</option>
-          <option value="10">180日ボンド（割引10%・実績期間利回り419.02%相当）</option>
-          <option value="15" selected>360日ボンド（割引15%・実績期間利回り2,346.21%相当）</option>
-          <option value="custom">カスタム割引率</option>
-        </select>
-      </div>
-      <div class="field" id="customDiscountWrap" style="display:none;">
-        <label>カスタム割引率（%）</label>
-        <input type="number" id="customDiscount" value="15" step="any">
-      </div>
-      <div class="field">
-        <label>成長モデル</label>
-        <select id="growthModel">
-          <option value="anchor" selected>実績アンカーベース（540日ステーキングの実績期間利回りから算出）</option>
+        <label>運用方法（商品タイプ）</label>
+        <select id="productType">
+          <option value="staking" selected>ステーキング（実績: 1/30/90/180/360/540日）</option>
+          <option value="bondburn">債券バーン（実績: 180日・360日／540日以降は推定）</option>
+          <option value="lpbond">LPボンド（実績データ不足のため簡易近似）</option>
           <option value="manual">手動レート入力（自分でリベース率を指定）</option>
         </select>
       </div>
@@ -274,7 +263,7 @@
       </div>
     </div>
 
-    <div class="result-row"><span class="label">割引反映後の実質投資元本（開始残高）</span><span class="val" id="effectivePrincipal">$0</span></div>
+    <div class="result-row"><span class="label" id="productNoteLabel">使用する実績カーブ</span><span class="val" id="effectivePrincipal" style="font-size:12.5px;font-weight:700;"></span></div>
 
     <div class="total-box" style="background:linear-gradient(120deg,#fff4e0,#fff0f0);border-color:#ffe0b0;">
       <div>
@@ -313,10 +302,11 @@
 
     <div class="footnote">
       ※ 手取り想定 = 残高 ×（1 − 出金リリース税率）×（1 − 売却税）で計算しています。<br>
-      ※ ボンド割引は「入金額 ÷（1 − 割引率）」を開始残高として一度だけ反映しています。ボンド満期ごとに再度割引を得て乗り換える前提までは織り込んでいません。<br>
-      ※ 「実績アンカーベース」モデルは、実際のステーキング画面で確認された期間利回り（1日0.80%／30日28.24%／90日112.23%／180日341.99%／360日1,753.72%／540日7,524.42%）を通る曲線（対数線形補間）で残高を計算しています。540日を超える期間は「満期の都度、同条件の540日ステーキングに乗り換える（ロールオーバー）」前提で540日サイクルを繰り返します。<br>
-      ※ 「手動レート入力」モードは旧来の簡易近似（リベース率の複利計算＋540日到達時に含み益へ+45%を一括加算）です。実績アンカーベースの方が実データに近いため、通常はそちらを推奨します。<br>
-      ※ ストレステストは「レートが今より○%下がり続けた場合」の下振れ確認用です。実績アンカーベースでは累積倍率の対数を割り引く形で反映しています。0%＝現状カーブ据え置きの試算です。
+      ※ <strong>ステーキング</strong>：実際のステーキング画面で確認された期間利回り（1日0.80%／30日28.24%／90日112.23%／180日341.99%／360日1,753.72%／540日7,524.42%）を通る曲線（対数線形補間）です。540日超は同条件で乗り換える（ロールオーバー）前提で540日サイクルを繰り返します。割引はありません。<br>
+      ※ <strong>債券バーン</strong>：ボンド一覧画面で確認された期間利回り（180日419.02%／360日2,346.21%）をそのまま使っています。割引購入の効果はこの数字にすでに織り込まれているため、別枠での割引計算はしていません。<strong>540日以降の数値は未確認</strong>のため、360日サイクルを繰り返すと仮定した推定値です（実際の540日プランの割引率・期間利回りが分かれば、より正確な数値に置き換えられます）。<br>
+      ※ <strong>LPボンド</strong>：実績データがまだないため、暫定的に債券バーンと同じ曲線を流用しています。実際の割引率・期間利回りが分かり次第、専用の数値に置き換えます。<br>
+      ※ 「手動レート入力」モードは簡易近似（リベース率の複利計算＋540日到達時に含み益へ+45%を一括加算）です。<br>
+      ※ ストレステストは「レートが今より○%下がり続けた場合」の下振れ確認用です。累積倍率の対数を割り引く形で反映しています。0%＝現状カーブ据え置きの試算です。
     </div>
   </div>
 
@@ -563,7 +553,8 @@ function releaseTaxFor(days){
   return t0 + (t1-t0) * ((d-d0)/(d1-d0));
 }
 
-// 実績ステーキング画面で確認された期間利回りアンカー（日数 -> 累積倍率）
+// 各商品ごとの実績期間利回りアンカー（日数 -> 累積倍率、入金額そのものに対する倍率）
+// ステーキング：ステーキング画面の期間利回りをそのまま使用（割引なし）
 const STAKE_ANCHORS = [
   [0, 1],
   [1, 1.0080],
@@ -573,7 +564,20 @@ const STAKE_ANCHORS = [
   [360, 18.5372],
   [540, 76.2442]
 ];
-const CYCLE_DAYS = 540;
+// 債券バーン：ボンド一覧画面の期間利回り（割引購入の効果は既に織り込み済み）。540日以降は未確認のため360日サイクルのロールオーバーで推定
+const BOND_BURN_ANCHORS = [
+  [0, 1],
+  [180, 5.1902],
+  [360, 24.4621]
+];
+// LPボンド：実績データ未取得のため、暫定的に債券バーンと同じ曲線を流用
+const LP_BOND_ANCHORS = BOND_BURN_ANCHORS;
+
+const PRODUCT_CONFIG = {
+  staking:  {anchors: STAKE_ANCHORS,     cycleDays: 540, label: "ステーキング実績カーブ（1〜540日、割引なし）"},
+  bondburn: {anchors: BOND_BURN_ANCHORS, cycleDays: 360, label: "債券バーン実績カーブ（180日・360日実績／540日以降は360日サイクルの推定）"},
+  lpbond:   {anchors: LP_BOND_ANCHORS,   cycleDays: 360, label: "LPボンド（実績データ未取得のため債券バーンの数値で暫定近似）"}
+};
 
 function interpLogLinear(anchors, d){
   if(d <= 0) return 1;
@@ -589,11 +593,11 @@ function interpLogLinear(anchors, d){
   return anchors[anchors.length-1][1];
 }
 
-function anchorMultiplier(days, stressFrac){
-  const cycles = Math.floor(days / CYCLE_DAYS);
-  const rem = days - cycles * CYCLE_DAYS;
-  const fullCycleM = STAKE_ANCHORS[STAKE_ANCHORS.length-1][1];
-  const remM = interpLogLinear(STAKE_ANCHORS, rem);
+function anchorMultiplier(days, stressFrac, anchors, cycleDays){
+  const cycles = Math.floor(days / cycleDays);
+  const rem = days - cycles * cycleDays;
+  const fullCycleM = interpLogLinear(anchors, cycleDays);
+  const remM = interpLogLinear(anchors, rem);
   let raw = Math.pow(fullCycleM, cycles) * remM;
   if(stressFrac > 0){
     raw = Math.exp(Math.log(raw) * (1 - stressFrac));
@@ -602,17 +606,11 @@ function anchorMultiplier(days, stressFrac){
 }
 
 function recalcCard2(){
-  const principalInput = parseFloat(document.getElementById('principal').value) || 0;
-  const bondPresetSel = document.getElementById('bondPreset').value;
-  const customDiscount = parseFloat(document.getElementById('customDiscount').value) || 0;
-  document.getElementById('customDiscountWrap').style.display = (bondPresetSel === 'custom') ? '' : 'none';
-  const discountPct = (bondPresetSel === 'custom') ? customDiscount : parseFloat(bondPresetSel);
-  const discountFrac = Math.min(Math.max(discountPct,0),95) / 100;
-  const principal = discountFrac > 0 ? principalInput / (1 - discountFrac) : principalInput;
+  const principal = parseFloat(document.getElementById('principal').value) || 0;
 
-  const growthModel = document.getElementById('growthModel').value;
-  document.getElementById('manualRateWrap').style.display = (growthModel === 'manual') ? '' : 'none';
-  document.getElementById('manualBonusWrap').style.display = (growthModel === 'manual') ? '' : 'none';
+  const productType = document.getElementById('productType').value;
+  document.getElementById('manualRateWrap').style.display = (productType === 'manual') ? '' : 'none';
+  document.getElementById('manualBonusWrap').style.display = (productType === 'manual') ? '' : 'none';
 
   const rebaseRate = (parseFloat(document.getElementById('rebaseRate').value) || 0) / 100;
   const simDays = parseInt(document.getElementById('simDays').value) || 0;
@@ -623,15 +621,16 @@ function recalcCard2(){
   const fx = parseFloat(document.getElementById('fxRate').value) || 1;
 
   document.getElementById('stressOut').textContent = stress + "%";
-  document.getElementById('effectivePrincipal').textContent = fmtUSD(principal) + (discountFrac>0 ? `（入金額 ${fmtUSD(principalInput)} を${discountPct}%割引でボンド購入したと仮定）` : "");
+  document.getElementById('effectivePrincipal').textContent = PRODUCT_CONFIG[productType] ? PRODUCT_CONFIG[productType].label : "手動レート入力";
 
   const effRate = rebaseRate * (1 - stress/100);
   const releaseTax = releaseTaxFor(releaseDays);
 
   function balanceAtDay(days){
     let balance;
-    if(growthModel === 'anchor'){
-      balance = principal * anchorMultiplier(days, stress/100);
+    const cfg = PRODUCT_CONFIG[productType];
+    if(cfg){
+      balance = principal * anchorMultiplier(days, stress/100, cfg.anchors, cfg.cycleDays);
     } else {
       balance = principal * Math.pow(1 + effRate, 2 * days);
       if(bonusEnabled && days >= 540){
@@ -677,21 +676,21 @@ function recalcCard2(){
   // 元本回収（現在の設定）
   const MAX_SEARCH_DAYS = 3650;
   const netAtDay = d => balanceAtDay(d) * (1 - releaseTax) * (1 - sellTax);
-  const breakevenDay = findBreakevenDay(netAtDay, principalInput, MAX_SEARCH_DAYS);
+  const breakevenDay = findBreakevenDay(netAtDay, principal, MAX_SEARCH_DAYS);
   const releaseLabelMap = {7:"7日",14:"14日",21:"21日",28:"28日",35:"35日",45:"45日"};
   if(breakevenDay == null){
     document.getElementById('breakevenHeadline').textContent = "10年以内に回収できません";
-    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principalInput)} に対して、この設定（成長率・税率）では10年経っても手取りが上回りません。レート設定やストレステストを見直してください。`;
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、この設定（成長率・税率）では10年経っても手取りが上回りません。レート設定やストレステストを見直してください。`;
   } else {
     document.getElementById('breakevenHeadline').textContent = fmtDaysSpan(breakevenDay);
-    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principalInput)} に対して、リリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（税率${(releaseTax*100).toFixed(0)}%）＋売却税${(sellTax*100).toFixed(1)}%の設定で、手取りが上回る見込みの日数です。`;
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、リリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（税率${(releaseTax*100).toFixed(0)}%）＋売却税${(sellTax*100).toFixed(1)}%の設定で、手取りが上回る見込みの日数です。`;
   }
 
   const beTbody = document.getElementById('breakevenTableBody');
   beTbody.innerHTML = "";
   [7,14,21,28,35,45].forEach(rd => {
     const rt = releaseTaxFor(rd);
-    const be = findBreakevenDay(d => balanceAtDay(d) * (1-rt) * (1-sellTax), principalInput, MAX_SEARCH_DAYS);
+    const be = findBreakevenDay(d => balanceAtDay(d) * (1-rt) * (1-sellTax), principal, MAX_SEARCH_DAYS);
     const tr = document.createElement('tr');
     const beLabel = be == null ? "10年以内に回収不可" : fmtDaysSpan(be);
     const isCurrent = rd === releaseDays;
@@ -700,7 +699,7 @@ function recalcCard2(){
   });
 
   const dayTickFmt = d => d>=365 ? Math.round(d/365*10)/10 + "年" : Math.round(d) + "日";
-  const principalLine = [[0, principalInput], [simDays, principalInput]];
+  const principalLine = [[0, principal], [simDays, principal]];
   const vlines = breakevenDay != null && breakevenDay <= simDays
     ? [{x: breakevenDay, color: 'var(--pink)', label: '元本回収'}]
     : [];
