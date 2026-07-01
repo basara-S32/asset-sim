@@ -108,7 +108,7 @@
   .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
   .table-scroll table{min-width:480px;}
 
-  .log-form-grid{grid-template-columns:1fr 1fr 1.4fr auto;align-items:end;}
+  .log-form-grid{grid-template-columns:1fr 1fr 1fr 1.3fr auto;align-items:end;}
 
   @media (max-width:640px){
     body{padding:16px 10px 50px;}
@@ -276,13 +276,30 @@
 
     <div class="result-row"><span class="label">割引反映後の実質投資元本（開始残高）</span><span class="val" id="effectivePrincipal">$0</span></div>
 
+    <div class="total-box" style="background:linear-gradient(120deg,#fff4e0,#fff0f0);border-color:#ffe0b0;">
+      <div>
+        <div class="label">🔒 元本回収の目安（手取りベースで入金額を超える日）</div>
+        <div class="sub-val" id="breakevenDetail"></div>
+      </div>
+      <div class="val" id="breakevenHeadline" style="color:var(--pink);">-</div>
+    </div>
+
+    <div class="table-scroll">
+      <table style="margin-top:12px;">
+        <thead><tr><th style="text-align:left;">出金リリース日数を選んだ場合</th><th>税率</th><th>元本回収の目安</th></tr></thead>
+        <tbody id="breakevenTableBody"></tbody>
+      </table>
+    </div>
+    <div class="footnote">※ リリース日数が短いほど税率は高いですが早く現金化でき、長いほど税率は低い代わりに解放まで待つ必要があります。元本回収を急ぐか、手取り効率を優先するかの比較用です。</div>
+
     <div class="chart-wrap">
       <div class="chart-legend">
         <span class="legend-dot" style="background:var(--accent);"></span>残高（税引前）
         <span class="legend-dot" style="background:#00a186;margin-left:16px;"></span>手取り（税引後）
+        <span class="legend-dot" style="background:var(--pink);margin-left:16px;"></span>元本ライン／回収日
       </div>
       <svg id="card2Chart" class="chart-svg" viewBox="0 0 640 260" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="footnote" style="margin-top:2px;">※ 縦軸は対数目盛りです（桁数が大きく変わるため、目盛り間隔は「10倍」ごとになっています）。</div>
+      <div class="footnote" style="margin-top:2px;">※ 縦軸は対数目盛りです（桁数が大きく変わるため、目盛り間隔は「10倍」ごとになっています）。ピンクの点線は入金額（元本）のラインです。</div>
     </div>
 
     <div class="table-scroll">
@@ -308,16 +325,32 @@
     <h2>📝 ③ 実績トラッキング（自分の記録から将来予測）</h2>
     <div class="desc">アプリを見るたびに「日付」と「その時点の残高（USD）」を記録するだけです。途中で引き出しても、残高が実際どう動いたかがそのまま反映されるので、内部の計算式を推測する必要はありません。記録はこのブラウザに自動保存されます。</div>
 
-    <div class="grid log-form-grid">
+    <div class="grid" style="max-width:320px;">
+      <div class="field">
+        <label>🔒 初期投資額（元本, USD）</label>
+        <input type="number" id="logPrincipal" step="any" placeholder="例: 10000">
+      </div>
+    </div>
+
+    <div class="grid log-form-grid" style="margin-top:12px;">
       <div class="field"><label>日付</label><input type="date" id="logDate"></div>
       <div class="field"><label>残高（USD）</label><input type="number" id="logBalance" step="any" placeholder="例: 12500"></div>
-      <div class="field"><label>メモ（任意）</label><input type="text" id="logNote" placeholder="例: 出金$500済み／全額再投資 など"></div>
+      <div class="field"><label>今回の出金額（あれば）</label><input type="number" id="logWithdraw" step="any" placeholder="例: 500（なければ0）"></div>
+      <div class="field"><label>メモ（任意）</label><input type="text" id="logNote" placeholder="例: 全額再投資 など"></div>
       <div class="field"><button id="addLogBtn" class="btn">記録を追加</button></div>
+    </div>
+
+    <div class="total-box" id="recoveryBox" style="display:none;background:linear-gradient(120deg,#fff4e0,#fff0f0);border-color:#ffe0b0;margin-top:16px;">
+      <div>
+        <div class="label">🔒 元本回収の状況（引き出し済み累計 ＋ 現在残高 で判定）</div>
+        <div class="sub-val" id="recoveryDetail"></div>
+      </div>
+      <div class="val" id="recoveryHeadline" style="color:var(--pink);">-</div>
     </div>
 
     <div class="table-scroll">
       <table id="logTable" style="margin-top:16px;">
-        <thead><tr><th style="text-align:left;">日付</th><th>残高（USD）</th><th style="text-align:left;">メモ</th><th>間隔からの実質日利</th><th></th></tr></thead>
+        <thead><tr><th style="text-align:left;">日付</th><th>残高（USD）</th><th>出金額</th><th style="text-align:left;">メモ</th><th>間隔からの実質日利</th><th></th></tr></thead>
         <tbody id="logTableBody"></tbody>
       </table>
     </div>
@@ -468,7 +501,35 @@ function drawLineChart(svgId, series, opts){
     }
   });
 
+  // vertical marker lines (e.g. breakeven day)
+  if(opts.vlines){
+    opts.vlines.forEach(v => {
+      if(v.x == null || !isFinite(v.x) || v.x < xMin || v.x > xMax) return;
+      const x = scaleX(v.x);
+      svgContent += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${H-padB}" stroke="${v.color}" stroke-width="1.5" stroke-dasharray="3,4"/>`;
+      if(v.label){
+        svgContent += `<text x="${x+4}" y="${padT+10}" font-size="10" fill="${v.color}" font-weight="700">${v.label}</text>`;
+      }
+    });
+  }
+
   svg.innerHTML = svgContent;
+}
+
+function findBreakevenDay(fn, target, maxDays){
+  if(fn(0) >= target) return 0;
+  if(fn(maxDays) < target) return null;
+  let lo = 0, hi = maxDays;
+  for(let i=0;i<60;i++){
+    const mid = (lo+hi)/2;
+    if(fn(mid) >= target) hi = mid; else lo = mid;
+  }
+  return hi;
+}
+function fmtDaysSpan(d){
+  if(d < 30) return Math.round(d) + "日";
+  if(d < 365) return Math.round(d) + "日（約" + (Math.round(d/30*10)/10) + "ヶ月）";
+  return Math.round(d) + "日（約" + (Math.round(d/365*10)/10) + "年）";
 }
 
 function recalcCard1(){
@@ -612,11 +673,42 @@ function recalcCard2(){
     grossPts.push([d, bal]);
     netPts.push([d, net]);
   }
+
+  // 元本回収（現在の設定）
+  const MAX_SEARCH_DAYS = 3650;
+  const netAtDay = d => balanceAtDay(d) * (1 - releaseTax) * (1 - sellTax);
+  const breakevenDay = findBreakevenDay(netAtDay, principalInput, MAX_SEARCH_DAYS);
+  const releaseLabelMap = {7:"7日",14:"14日",21:"21日",28:"28日",35:"35日",45:"45日"};
+  if(breakevenDay == null){
+    document.getElementById('breakevenHeadline').textContent = "10年以内に回収できません";
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principalInput)} に対して、この設定（成長率・税率）では10年経っても手取りが上回りません。レート設定やストレステストを見直してください。`;
+  } else {
+    document.getElementById('breakevenHeadline').textContent = fmtDaysSpan(breakevenDay);
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principalInput)} に対して、リリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（税率${(releaseTax*100).toFixed(0)}%）＋売却税${(sellTax*100).toFixed(1)}%の設定で、手取りが上回る見込みの日数です。`;
+  }
+
+  const beTbody = document.getElementById('breakevenTableBody');
+  beTbody.innerHTML = "";
+  [7,14,21,28,35,45].forEach(rd => {
+    const rt = releaseTaxFor(rd);
+    const be = findBreakevenDay(d => balanceAtDay(d) * (1-rt) * (1-sellTax), principalInput, MAX_SEARCH_DAYS);
+    const tr = document.createElement('tr');
+    const beLabel = be == null ? "10年以内に回収不可" : fmtDaysSpan(be);
+    const isCurrent = rd === releaseDays;
+    tr.innerHTML = `<td style="text-align:left;${isCurrent?'font-weight:800;color:var(--accent);':''}">${releaseLabelMap[rd]}${isCurrent?' ← 今の設定':''}</td><td>${(rt*100).toFixed(0)}%</td><td>${beLabel}</td>`;
+    beTbody.appendChild(tr);
+  });
+
   const dayTickFmt = d => d>=365 ? Math.round(d/365*10)/10 + "年" : Math.round(d) + "日";
+  const principalLine = [[0, principalInput], [simDays, principalInput]];
+  const vlines = breakevenDay != null && breakevenDay <= simDays
+    ? [{x: breakevenDay, color: 'var(--pink)', label: '元本回収'}]
+    : [];
   drawLineChart('card2Chart', [
     {points: grossPts, color: 'var(--accent)'},
-    {points: netPts, color: '#00a186'}
-  ], {logScale:true, xFormatter: dayTickFmt, yFormatter: v => fmtUSD(v)});
+    {points: netPts, color: '#00a186'},
+    {points: principalLine, color: 'var(--pink)', dashed:true}
+  ], {logScale:true, xFormatter: dayTickFmt, yFormatter: v => fmtUSD(v), vlines});
 }
 
 function recalcAll(){ recalcCard1(); recalcCard2(); }
@@ -630,6 +722,7 @@ recalcAll();
 
 // ============ CARD 3: 実績トラッキング ============
 const LOG_KEY = 'cdao_sim_log_entries_v1';
+const PRINCIPAL_KEY = 'cdao_sim_log_principal_v1';
 
 function loadLog(){
   try{
@@ -639,6 +732,53 @@ function loadLog(){
 }
 function saveLog(entries){
   localStorage.setItem(LOG_KEY, JSON.stringify(entries));
+}
+function loadPrincipal(){
+  const v = parseFloat(localStorage.getItem(PRINCIPAL_KEY));
+  return isFinite(v) ? v : 0;
+}
+function savePrincipal(v){
+  localStorage.setItem(PRINCIPAL_KEY, String(v));
+}
+
+function updateRecoveryBox(entries){
+  const principal = loadPrincipal();
+  const box = document.getElementById('recoveryBox');
+  if(!principal || !entries.length){
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = '';
+
+  const withdrawnTotal = entries.reduce((sum,e) => sum + (parseFloat(e.withdraw)||0), 0);
+  const last = entries[entries.length-1];
+  const recoveredTotal = withdrawnTotal + last.balance;
+  const pct = (recoveredTotal / principal) * 100;
+
+  if(recoveredTotal >= principal){
+    document.getElementById('recoveryHeadline').textContent = "✅ 回収済み";
+    document.getElementById('recoveryDetail').textContent =
+      `元本 ${fmtUSD(principal)} に対して、引き出し累計 ${fmtUSD(withdrawnTotal)} ＋ 現在残高 ${fmtUSD(last.balance)} ＝ ${fmtUSD(recoveredTotal)}（元本の${pct.toFixed(0)}%）。すでに元本以上を確保できています。`;
+  } else {
+    const gap = principal - withdrawnTotal;
+    let etaText = "";
+    if(entries.length >= 2 && last.balance > 0 && gap > 0){
+      const prev = entries[entries.length-2];
+      const days = (new Date(last.date) - new Date(prev.date)) / 86400000;
+      if(days > 0 && prev.balance > 0){
+        const dailyRate = Math.pow(last.balance/prev.balance, 1/days) - 1;
+        if(dailyRate > 0 && last.balance < gap){
+          const etaDays = Math.log(gap/last.balance) / Math.log(1+dailyRate);
+          if(isFinite(etaDays) && etaDays > 0) etaText = `直近の伸び率が続けば、あと約${fmtDaysSpan(etaDays)}で残高だけでも元本に到達する見込みです。`;
+        } else if(last.balance >= gap){
+          etaText = "現在の残高だけで、引き出し分と合わせるとほぼ元本に届いています。";
+        }
+      }
+    }
+    document.getElementById('recoveryHeadline').textContent = `残り ${fmtUSD(gap - last.balance > 0 ? gap - last.balance : 0)}`;
+    document.getElementById('recoveryDetail').textContent =
+      `元本 ${fmtUSD(principal)} に対して、引き出し累計 ${fmtUSD(withdrawnTotal)} ＋ 現在残高 ${fmtUSD(last.balance)} ＝ ${fmtUSD(recoveredTotal)}（元本の${pct.toFixed(0)}%）。${etaText}`;
+  }
 }
 
 function renderLog(){
@@ -660,7 +800,8 @@ function renderLog(){
     }
     const tr = document.createElement('tr');
     const noteEsc = (e.note || '').replace(/</g,'&lt;');
-    tr.innerHTML = `<td style="text-align:left;">${e.date}</td><td>${fmtUSD(e.balance)}</td><td style="text-align:left;color:var(--sub);">${noteEsc}</td><td>${rateLabel}</td><td></td>`;
+    const withdrawVal = parseFloat(e.withdraw) || 0;
+    tr.innerHTML = `<td style="text-align:left;">${e.date}</td><td>${fmtUSD(e.balance)}</td><td>${withdrawVal ? fmtUSD(withdrawVal) : '-'}</td><td style="text-align:left;color:var(--sub);">${noteEsc}</td><td>${rateLabel}</td><td></td>`;
     const delBtn = document.createElement('button');
     delBtn.className = 'btn-del';
     delBtn.textContent = '削除';
@@ -672,6 +813,8 @@ function renderLog(){
     tr.lastElementChild.appendChild(delBtn);
     tbody.appendChild(tr);
   });
+
+  updateRecoveryBox(entries);
 
   if(entries.length >= 2){
     computeLogProjection(entries);
@@ -730,17 +873,27 @@ function computeLogProjection(entries){
 document.getElementById('addLogBtn').addEventListener('click', () => {
   const date = document.getElementById('logDate').value;
   const balance = parseFloat(document.getElementById('logBalance').value);
+  const withdraw = parseFloat(document.getElementById('logWithdraw').value) || 0;
   const note = document.getElementById('logNote').value;
   if(!date || !isFinite(balance)){ return; }
   const entries = loadLog();
-  entries.push({date, balance, note});
+  entries.push({date, balance, withdraw, note});
   saveLog(entries);
   document.getElementById('logBalance').value = '';
+  document.getElementById('logWithdraw').value = '';
   document.getElementById('logNote').value = '';
   renderLog();
 });
 
 document.getElementById('logBasis').addEventListener('change', renderLog);
+
+const logPrincipalEl = document.getElementById('logPrincipal');
+const storedPrincipal = loadPrincipal();
+if(storedPrincipal) logPrincipalEl.value = storedPrincipal;
+logPrincipalEl.addEventListener('input', () => {
+  savePrincipal(parseFloat(logPrincipalEl.value) || 0);
+  renderLog();
+});
 
 const logDateEl = document.getElementById('logDate');
 if(logDateEl && !logDateEl.value){ logDateEl.valueAsDate = new Date(); }
