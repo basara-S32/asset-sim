@@ -86,6 +86,19 @@
     background:linear-gradient(120deg,var(--accent),var(--pink));color:#fff;margin-left:8px;
     font-weight:700;vertical-align:middle;
   }
+  .tab-bar{
+    display:flex;gap:8px;margin-bottom:22px;background:#fff;border:1px solid var(--border);
+    border-radius:16px;padding:6px;box-shadow:0 6px 18px rgba(124,92,255,0.08);
+  }
+  .tab-btn{
+    flex:1;padding:11px 12px;border:none;border-radius:12px;background:transparent;
+    color:var(--sub);font-size:13.5px;font-weight:800;cursor:pointer;transition:all .15s ease;
+    text-align:center;
+  }
+  .tab-btn.active{background:linear-gradient(120deg,var(--accent),var(--pink));color:#fff;box-shadow:0 6px 16px rgba(124,92,255,0.3);}
+  .tab-btn:not(.active):hover{background:#faf8ff;color:var(--text);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
   .btn{
     width:100%;padding:11px 14px;background:linear-gradient(120deg,var(--accent),var(--pink));
     color:#fff;border:none;border-radius:14px;font-size:13.5px;font-weight:800;cursor:pointer;
@@ -127,6 +140,8 @@
     th,td{padding:7px 5px;}
     .btn{padding:13px 14px;font-size:14px;}
     .badge{display:block;margin-left:0;margin-top:8px;width:fit-content;}
+    .tab-bar{flex-direction:column;gap:6px;padding:5px;}
+    .tab-btn{font-size:12.5px;padding:12px 10px;}
   }
 </style>
 </head>
@@ -138,6 +153,14 @@
   <div class="notice">
     ⚠ これは入力した前提（リベース率・税率・レート）に基づく<strong>試算ツール</strong>です。将来の利率・税制・トークン価格を保証するものではなく、プロトコルの状況によって数値が変動・低下する可能性があります。実際の受取額とは差異が出ます。定期的に実績と照らし合わせてパラメータを調整してください。
   </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabBtnSimple" type="button">💰 簡易版（今の月利をサクッと計算）</button>
+    <button class="tab-btn" id="tabBtnDetail" type="button">🔬 詳細版（長期シミュレーション＆実績トラッキング）</button>
+  </div>
+
+  <!-- ================= 簡易版 ================= -->
+  <div class="tab-panel active" id="tabPanelSimple">
 
   <!-- ================= CARD 1: 現在の月利計算 ================= -->
   <div class="card card-1">
@@ -203,6 +226,11 @@
       <div class="val" id="totalJpy">¥0</div>
     </div>
   </div>
+
+  </div><!-- /tabPanelSimple -->
+
+  <!-- ================= 詳細版 ================= -->
+  <div class="tab-panel" id="tabPanelDetail">
 
   <!-- ================= CARD 2: 長期複利シミュレーション ================= -->
   <div class="card card-2">
@@ -385,6 +413,8 @@
       </div>
     </div>
   </div>
+
+  </div><!-- /tabPanelDetail -->
 
   <div class="footnote" style="text-align:center;">
     数値は自己入力パラメータに基づく試算であり、投資助言ではありません。プロトコルの状況（トレジャリー残高・レート改定・出金制限など）により実際の結果は変動します。
@@ -904,6 +934,20 @@ const logDateEl = document.getElementById('logDate');
 if(logDateEl && !logDateEl.value){ logDateEl.valueAsDate = new Date(); }
 
 renderLog();
+
+// ============ タブ切り替え（簡易版／詳細版） ============
+const TAB_KEY = 'cdao_sim_active_tab_v1';
+function setActiveTab(tab){
+  const isSimple = tab === 'simple';
+  document.getElementById('tabPanelSimple').classList.toggle('active', isSimple);
+  document.getElementById('tabPanelDetail').classList.toggle('active', !isSimple);
+  document.getElementById('tabBtnSimple').classList.toggle('active', isSimple);
+  document.getElementById('tabBtnDetail').classList.toggle('active', !isSimple);
+  localStorage.setItem(TAB_KEY, tab);
+}
+document.getElementById('tabBtnSimple').addEventListener('click', () => setActiveTab('simple'));
+document.getElementById('tabBtnDetail').addEventListener('click', () => setActiveTab('detail'));
+setActiveTab(localStorage.getItem(TAB_KEY) === 'detail' ? 'detail' : 'simple');
 </script>
 </body>
 </html>
