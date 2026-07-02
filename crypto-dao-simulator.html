@@ -341,7 +341,7 @@
   <!-- ================= CARD 3: 実績トラッキング ================= -->
   <div class="card card-3">
     <h2>📝 ③ 実績トラッキング（自分の記録から将来予測）</h2>
-    <div class="desc">アプリを見るたびに「日付」と「その時点の残高（USD）」を記録するだけです。途中で引き出しても、残高が実際どう動いたかがそのまま反映されるので、内部の計算式を推測する必要はありません。記録はこのブラウザに自動保存されます。</div>
+    <div class="desc">アプリを見るたびに「日付」と「その時点の残高（USD）」を記録するだけです。途中で引き出しても、残高が実際どう動いたかがそのまま反映されるので、内部の計算式を推測する必要はありません。記録はこのブラウザにのみ自動保存されます（別PC・別ブラウザには自動では引き継がれません。下のエクスポート／インポートで手動同期してください）。</div>
 
     <div class="grid" style="max-width:320px;">
       <div class="field">
@@ -349,6 +349,13 @@
         <input type="number" id="logPrincipal" step="any" placeholder="例: 10000">
       </div>
     </div>
+
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+      <button id="exportLogBtn" class="btn" style="width:auto;padding:8px 16px;font-size:12.5px;">📤 記録をエクスポート（ファイル保存）</button>
+      <button id="importLogBtn" class="btn" style="width:auto;padding:8px 16px;font-size:12.5px;background:linear-gradient(120deg,var(--accent2),var(--accent));">📥 記録をインポート（別PCの記録を取り込む）</button>
+      <input type="file" id="importLogFile" accept="application/json" style="display:none;">
+    </div>
+    <div class="footnote" id="importStatus"></div>
 
     <div class="grid log-form-grid" style="margin-top:12px;">
       <div class="field"><label>日付</label><input type="date" id="logDate"></div>
@@ -928,6 +935,64 @@ if(storedPrincipal) logPrincipalEl.value = storedPrincipal;
 logPrincipalEl.addEventListener('input', () => {
   savePrincipal(parseFloat(logPrincipalEl.value) || 0);
   renderLog();
+});
+
+function exportLog(){
+  const data = {
+    exportedAt: new Date().toISOString(),
+    principal: loadPrincipal(),
+    entries: loadLog()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cdao-sim-log-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importLogFromFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      const incoming = Array.isArray(data.entries) ? data.entries : [];
+      const current = loadLog();
+      const keyOf = e => `${e.date}|${e.balance}|${e.withdraw||0}|${e.note||''}`;
+      const existingKeys = new Set(current.map(keyOf));
+      let added = 0;
+      incoming.forEach(e => {
+        if(!e.date || !isFinite(e.balance)) return;
+        const k = keyOf(e);
+        if(!existingKeys.has(k)){
+          current.push({date:e.date, balance:e.balance, withdraw:e.withdraw||0, note:e.note||''});
+          existingKeys.add(k);
+          added++;
+        }
+      });
+      saveLog(current);
+      if(!loadPrincipal() && isFinite(data.principal) && data.principal>0){
+        savePrincipal(data.principal);
+        logPrincipalEl.value = data.principal;
+      }
+      document.getElementById('importStatus').textContent = `✅ ${added}件の新しい記録を取り込みました（重複はスキップしました）。`;
+      renderLog();
+    }catch(err){
+      document.getElementById('importStatus').textContent = '❌ 読み込みに失敗しました。ファイルの中身を確認してください。';
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('exportLogBtn').addEventListener('click', exportLog);
+document.getElementById('importLogBtn').addEventListener('click', () => document.getElementById('importLogFile').click());
+document.getElementById('importLogFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(file) importLogFromFile(file);
+  e.target.value = '';
 });
 
 const logDateEl = document.getElementById('logDate');
