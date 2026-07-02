@@ -177,7 +177,8 @@
         <input type="number" id="bondQty" value="0" min="0" step="any">
       </div>
       <div class="field">
-        <label>③ コミュニティ＆ランク報酬 受取実績（合計）</label>
+        <label>③ コミュニティ＆紹介報酬 受取実績（合計）</label>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:5px;">※12時間ごとの報酬を入力</div>
         <input type="number" id="commRewardSum" value="0" min="0" step="any">
       </div>
     </div>
@@ -190,23 +191,7 @@
           <input type="number" id="baseRate" value="0.004" step="any">
         </div>
         <div class="field">
-          <label>ボンド倍率</label>
-          <input type="number" id="bondMultiplier" value="1.45" step="any">
-        </div>
-        <div class="field">
-          <label>係数A（秒定数①）</label>
-          <input type="number" id="factorA" value="60" step="any">
-        </div>
-        <div class="field">
-          <label>係数B（秒定数②）</label>
-          <input type="number" id="factorB" value="60" step="any">
-        </div>
-        <div class="field">
-          <label>トークン単価（JPY）</label>
-          <input type="number" id="priceJPY" value="162" step="any">
-        </div>
-        <div class="field">
-          <label>為替レート（JPY / USD）</label>
+          <label>為替レート（JPY / USD）＝トークン単価（JPY）</label>
           <input type="number" id="fxRate" value="155" step="any">
         </div>
       </div>
@@ -215,7 +200,7 @@
     <div style="margin-top:18px;">
       <div class="result-row"><span class="label">① ステーキング報酬 月利見込み</span><span class="val" id="r1">¥0</span></div>
       <div class="result-row"><span class="label">② LPボンド＆債権バーン 月利見込み</span><span class="val" id="r2">¥0</span></div>
-      <div class="result-row"><span class="label">③ コミュニティ＆ランク報酬 月利見込み</span><span class="val" id="r3">¥0</span></div>
+      <div class="result-row"><span class="label">③ コミュニティ＆紹介報酬 月利見込み</span><span class="val" id="r3">¥0</span></div>
     </div>
 
     <div class="total-box">
@@ -565,14 +550,14 @@ function recalcCard1(){
   const commSum = parseFloat(document.getElementById('commRewardSum').value) || 0;
 
   const baseRate = parseFloat(document.getElementById('baseRate').value) || 0;
-  const bondMult = parseFloat(document.getElementById('bondMultiplier').value) || 0;
-  const fA = parseFloat(document.getElementById('factorA').value) || 0;
-  const fB = parseFloat(document.getElementById('factorB').value) || 0;
-  const price = parseFloat(document.getElementById('priceJPY').value) || 0;
+  const bondMult = 1.45;
+  const fA = 60;
+  const fB = 60;
   const fx = parseFloat(document.getElementById('fxRate').value) || 1;
+  const price = fx;
 
-  const r1 = stakeQty * baseRate * fA * fB * price;
-  const r2 = bondQty * baseRate * bondMult * fA * fB * price;
+  const r1 = stakeQty * baseRate * fA * bondMult * fB * price;
+  const r2 = bondQty * baseRate * fA * fB * price;
   const r3 = commSum * fA * fB * price;
   const total = r1 + r2 + r3;
 
