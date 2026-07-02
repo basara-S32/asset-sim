@@ -233,7 +233,7 @@
       </div>
       <div class="field">
         <label>リベース率（% / 12時間）</label>
-        <input type="number" id="rebaseRate" value="0.4" step="any">
+        <input type="number" id="rebaseRate" value="0.4" min="0" step="any">
       </div>
       <div class="field">
         <label>シミュレーション期間（日）</label>
@@ -248,27 +248,17 @@
           <option value="45">45日（税率2%・運営資料ベース1%＋売却税1%込み/未確認）</option>
         </select>
       </div>
-      <div class="field">
-        <label>ランク報酬（V3 Proコミュニティ管理報酬）</label>
-        <select id="rankBonus">
-          <option value="0" selected>なし</option>
-          <option value="0.15">V1（+15%）</option>
-          <option value="0.25">V2（+25%）</option>
-          <option value="0.35">V3（+35%）</option>
-          <option value="0.45">V4（+45%）</option>
-          <option value="0.55">V5（+55%）</option>
-          <option value="0.65">V6（+65%）</option>
-          <option value="0.75">V7（+75%）</option>
-          <option value="0.85">V8（+85%）</option>
-          <option value="0.95">V9（+95%）</option>
-          <option value="1.05">V10（+105%）</option>
-          <option value="1.15">V11（+115%）</option>
-          <option value="1.25">V12（+125%）</option>
-          <option value="1.35">V13（+135%）</option>
-          <option value="1.45">V14（+145%）</option>
-          <option value="1.55">V15（+155%）</option>
-        </select>
+    </div>
+
+    <div class="field" style="margin-top:12px;">
+      <label>ランク報酬スケジュール（V3 Proコミュニティ管理報酬・昇格予定を日数で反映）</label>
+      <div class="table-scroll">
+        <table id="rankScheduleTable">
+          <thead><tr><th style="text-align:left;">この月から</th><th style="text-align:left;">ランク</th><th></th></tr></thead>
+          <tbody id="rankScheduleBody"></tbody>
+        </table>
       </div>
+      <button id="addRankRowBtn" type="button" class="btn" style="width:auto;padding:6px 14px;font-size:12.5px;margin-top:8px;">＋ 行を追加</button>
     </div>
 
     <div class="result-row"><span class="label" id="productNoteLabel">運用元本・レート</span><span class="val" id="effectivePrincipal" style="font-size:12.5px;font-weight:700;"></span></div>
@@ -303,7 +293,7 @@
     <div class="footnote">
       ※ 手取り想定 = 入金額 +（残高 − 入金額）×（1 − 出金リリース税率）で計算しています。入金額（元本）部分には課税せず、増えた分（含み益）にのみ出金リリース税率を掛けています（出金リリース税率には売却税相当1%を一律で織り込み済み）。<br>
       ※ <strong>運用元本</strong> = 初期入金額 × 1.25（固定倍率）。この運用元本に対してリベース率（%/12時間）で複利計算しています：運用元本 ×（1+リベース率）^(2×経過日数)。<br>
-      ※ <strong>ランク報酬</strong>：V3 Proコミュニティ管理報酬（V1〜V15、+15%〜+155%）を選択すると、その分だけ複利の伸び率を底上げします。公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。ランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、この設定は「そのランクを維持できた場合」の理論値です。
+      ※ <strong>ランク報酬スケジュール</strong>：「この日からVランク」という行を複数追加でき、日数の区間ごとに違うランクのボーナス（+15%〜+155%）を複利計算に反映できます。将来ランクが上がっていく想定を織り込みたい場合に使ってください。公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。ランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、この設定は「そのスケジュール通りにランクを維持できた場合」の理論値です。
     </div>
   </div>
 
@@ -567,24 +557,126 @@ function releaseTaxFor(days){
 
 const WORKING_PRINCIPAL_MULT = 1.25;
 
+const RANK_OPTIONS = [
+  {value:"0", label:"なし"},
+  {value:"0.15", label:"V1（+15%）"},
+  {value:"0.25", label:"V2（+25%）"},
+  {value:"0.35", label:"V3（+35%）"},
+  {value:"0.45", label:"V4（+45%）"},
+  {value:"0.55", label:"V5（+55%）"},
+  {value:"0.65", label:"V6（+65%）"},
+  {value:"0.75", label:"V7（+75%）"},
+  {value:"0.85", label:"V8（+85%）"},
+  {value:"0.95", label:"V9（+95%）"},
+  {value:"1.05", label:"V10（+105%）"},
+  {value:"1.15", label:"V11（+115%）"},
+  {value:"1.25", label:"V12（+125%）"},
+  {value:"1.35", label:"V13（+135%）"},
+  {value:"1.45", label:"V14（+145%）"},
+  {value:"1.55", label:"V15（+155%）"}
+];
+
+let rankSchedule = [{day: 0, rank: 0}];
+
+function renderRankSchedule(){
+  rankSchedule.sort((a,b) => a.day - b.day);
+  const tbody = document.getElementById('rankScheduleBody');
+  tbody.innerHTML = "";
+  rankSchedule.forEach((row, idx) => {
+    const tr = document.createElement('tr');
+    const dayTd = document.createElement('td');
+    dayTd.style.textAlign = 'left';
+    const dayInput = document.createElement('select');
+    for(let m=0; m<=24; m++){
+      const o = document.createElement('option');
+      o.value = String(m * 30);
+      o.textContent = m + "ヶ月";
+      if(m * 30 === row.day) o.selected = true;
+      dayInput.appendChild(o);
+    }
+    dayInput.disabled = (idx === 0);
+    dayInput.addEventListener('change', () => {
+      row.day = parseInt(dayInput.value) || 0;
+      renderRankSchedule();
+      recalcAll();
+    });
+    dayTd.appendChild(dayInput);
+
+    const rankTd = document.createElement('td');
+    rankTd.style.textAlign = 'left';
+    const rankSelect = document.createElement('select');
+    RANK_OPTIONS.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      if(parseFloat(opt.value) === row.rank) o.selected = true;
+      rankSelect.appendChild(o);
+    });
+    rankSelect.addEventListener('change', () => {
+      row.rank = parseFloat(rankSelect.value) || 0;
+      recalcAll();
+    });
+    rankTd.appendChild(rankSelect);
+
+    const delTd = document.createElement('td');
+    if(rankSchedule.length > 1){
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn-del';
+      delBtn.textContent = '削除';
+      delBtn.type = 'button';
+      delBtn.addEventListener('click', () => {
+        rankSchedule.splice(idx, 1);
+        renderRankSchedule();
+        recalcAll();
+      });
+      delTd.appendChild(delBtn);
+    }
+
+    tr.appendChild(dayTd);
+    tr.appendChild(rankTd);
+    tr.appendChild(delTd);
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('addRankRowBtn').addEventListener('click', () => {
+  const last = rankSchedule[rankSchedule.length - 1];
+  rankSchedule.push({day: Math.min(last.day + 90, 720), rank: last.rank});
+  renderRankSchedule();
+  recalcAll();
+});
+
+renderRankSchedule();
+
 function recalcCard2(){
   const principal = parseFloat(document.getElementById('principal').value) || 0;
   const workingPrincipal = principal * WORKING_PRINCIPAL_MULT;
   document.getElementById('workingPrincipal').value = workingPrincipal ? workingPrincipal.toFixed(2) : "";
 
-  const rebaseRate = (parseFloat(document.getElementById('rebaseRate').value) || 0) / 100;
+  const rebaseRate = Math.max(0, parseFloat(document.getElementById('rebaseRate').value) || 0) / 100;
   const simDays = parseInt(document.getElementById('simDays').value) || 0;
   const releaseDays = parseInt(document.getElementById('releaseDays').value) || 7;
-  const rankBonusFrac = parseFloat(document.getElementById('rankBonus').value) || 0;
   const fx = parseFloat(document.getElementById('fxRate').value) || 1;
 
-  document.getElementById('effectivePrincipal').textContent = `運用元本 ${fmtUSD(workingPrincipal)}／リベース率 ${(rebaseRate*100).toFixed(2)}%/12時間`;
+  const segments = rankSchedule.slice().sort((a,b) => a.day - b.day);
+  const rankSummary = segments.map(s => `${s.day/30}ヶ月〜${RANK_OPTIONS.find(o=>parseFloat(o.value)===s.rank)?.label || 'なし'}`).join(' / ');
+  document.getElementById('effectivePrincipal').textContent = `運用元本 ${fmtUSD(workingPrincipal)}／リベース率 ${(rebaseRate*100).toFixed(2)}%/12時間／${rankSummary}`;
 
-  const effRate = rebaseRate * (1 + rankBonusFrac);
   const releaseTax = releaseTaxFor(releaseDays);
 
   function balanceAtDay(days){
-    return workingPrincipal * Math.pow(1 + effRate, 2 * days);
+    let balance = workingPrincipal;
+    for(let i=0; i<segments.length; i++){
+      const segStart = segments[i].day;
+      if(segStart >= days) break;
+      const segEnd = (i+1 < segments.length) ? Math.min(segments[i+1].day, days) : days;
+      const len = segEnd - segStart;
+      if(len > 0){
+        const effRate = rebaseRate * (1 + segments[i].rank);
+        balance *= Math.pow(1 + effRate, 2 * len);
+      }
+    }
+    return balance;
   }
 
   function netFromBalance(balance, taxRate){
@@ -644,6 +736,10 @@ function recalcAll(){ recalcCard1(); recalcCard2(); }
 document.querySelectorAll('input, select').forEach(el => {
   el.addEventListener('input', recalcAll);
   el.addEventListener('change', recalcAll);
+});
+
+document.getElementById('rebaseRate').addEventListener('input', function(){
+  if(parseFloat(this.value) < 0) this.value = 0;
 });
 
 recalcAll();
