@@ -225,27 +225,15 @@
     <div class="grid">
       <div class="field">
         <label>初期入金額（USD）</label>
-        <input type="number" id="principal" value="3000" step="any">
+        <input type="number" id="principal" value="1000" step="any">
       </div>
       <div class="field">
-        <label>運用方法（商品タイプ）</label>
-        <select id="productType">
-          <option value="staking" selected>ステーキング（実績: 1/30/90/180/360/540日）</option>
-          <option value="bondburn">債券バーン（実績: 180日・360日／540日以降は推定）</option>
-          <option value="lpbond">LPボンド（実績データ不足のため簡易近似）</option>
-          <option value="manual">手動レート入力（自分でリベース率を指定）</option>
-        </select>
+        <label>運用元本（初期入金額×1.25、自動計算）</label>
+        <input type="number" id="workingPrincipal" value="" step="any" readonly style="opacity:0.75;">
       </div>
-      <div class="field" id="manualRateWrap" style="display:none;">
+      <div class="field">
         <label>リベース率（% / 12時間）</label>
-        <input type="number" id="rebaseRate" value="0.44" step="any">
-      </div>
-      <div class="field" id="manualBonusWrap" style="display:none;">
-        <label>540日プラン 固定ボーナス（手動モード用）</label>
-        <select id="bonusEnabled">
-          <option value="0">なし</option>
-          <option value="1" selected>あり（540日到達時 +45%を利益部分に加算）</option>
-        </select>
+        <input type="number" id="rebaseRate" value="0.4" step="any">
       </div>
       <div class="field">
         <label>シミュレーション期間（日）</label>
@@ -254,27 +242,36 @@
       <div class="field">
         <label>出金リリース日数（税率に影響）</label>
         <select id="releaseDays">
-          <option value="7">7日（税率15%・実受取で確認済み）</option>
-          <option value="15">15日（税率 約12%・未確認/補間推定）</option>
-          <option value="30">30日（税率5%・運営資料ベース/未確認）</option>
-          <option value="45">45日（税率1%・運営資料ベース/未確認）</option>
+          <option value="7">7日（税率16%・実受取確認15%＋売却税1%込み）</option>
+          <option value="15">15日（税率 約13%・未確認/補間推定＋売却税1%込み）</option>
+          <option value="30">30日（税率6%・運営資料ベース5%＋売却税1%込み/未確認）</option>
+          <option value="45">45日（税率2%・運営資料ベース1%＋売却税1%込み/未確認）</option>
         </select>
       </div>
       <div class="field">
-        <label>売却税（%）</label>
-        <input type="number" id="sellTax" value="2.5" step="any">
+        <label>ランク報酬（V3 Proコミュニティ管理報酬）</label>
+        <select id="rankBonus">
+          <option value="0" selected>なし</option>
+          <option value="0.15">V1（+15%）</option>
+          <option value="0.25">V2（+25%）</option>
+          <option value="0.35">V3（+35%）</option>
+          <option value="0.45">V4（+45%）</option>
+          <option value="0.55">V5（+55%）</option>
+          <option value="0.65">V6（+65%）</option>
+          <option value="0.75">V7（+75%）</option>
+          <option value="0.85">V8（+85%）</option>
+          <option value="0.95">V9（+95%）</option>
+          <option value="1.05">V10（+105%）</option>
+          <option value="1.15">V11（+115%）</option>
+          <option value="1.25">V12（+125%）</option>
+          <option value="1.35">V13（+135%）</option>
+          <option value="1.45">V14（+145%）</option>
+          <option value="1.55">V15（+155%）</option>
+        </select>
       </div>
     </div>
 
-    <div style="margin-top:16px;">
-      <label>ストレステスト：想定レートを下げて試算する（自動ブレーキ・利率低下シナリオ）</label>
-      <div class="range-row">
-        <input type="range" id="stress" min="0" max="90" value="0" step="5">
-        <output id="stressOut">0%</output>
-      </div>
-    </div>
-
-    <div class="result-row"><span class="label" id="productNoteLabel">使用する実績カーブ</span><span class="val" id="effectivePrincipal" style="font-size:12.5px;font-weight:700;"></span></div>
+    <div class="result-row"><span class="label" id="productNoteLabel">運用元本・レート</span><span class="val" id="effectivePrincipal" style="font-size:12.5px;font-weight:700;"></span></div>
 
     <div class="total-box" style="background:linear-gradient(120deg,#fff4e0,#fff0f0);border-color:#ffe0b0;">
       <div>
@@ -291,18 +288,8 @@
       </table>
     </div>
     <div class="footnote">※ リリース日数が短いほど税率は高いですが早く現金化でき、長いほど税率は低い代わりに解放まで待つ必要があります。元本回収を急ぐか、手取り効率を優先するかの比較用です。<br>
-    ※ 7日＝税率15%は実際の受取画面（0.856/1.007129 PRO など）で確認済みです。30日＝5%・45日＝1%は運営資料ベースで未確認、15日はデータがないため7日〜30日の間で線形補間した推定値です。<br>
+    ※ 7日＝出金リリース税率15%は実際の受取画面（0.856/1.007129 PRO など）で確認済みです。30日＝5%・45日＝1%は運営資料ベースで未確認、15日はデータがないため7日〜30日の間で線形補間した推定値です。表示中の税率にはこれらへ売却税相当1%を一律で加算済みです。<br>
     ※ 実際の出金には、この後さらに「タービン」（PRO自動買い戻し、スリッページ1〜5%＋解放までの待ち時間）という工程があることが確認されていますが、そのコスト・所要日数は未確認のため、まだこの計算には含まれていません。実際の手取り額・回収日数はここで出る数値より悪化する可能性があります。</div>
-
-    <div class="chart-wrap">
-      <div class="chart-legend">
-        <span class="legend-dot" style="background:var(--accent);"></span>残高（税引前）
-        <span class="legend-dot" style="background:#00a186;margin-left:16px;"></span>手取り（税引後）
-        <span class="legend-dot" style="background:var(--pink);margin-left:16px;"></span>元本ライン／回収日
-      </div>
-      <svg id="card2Chart" class="chart-svg" viewBox="0 0 640 260" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="footnote" style="margin-top:2px;">※ 縦軸は対数目盛りです（桁数が大きく変わるため、目盛り間隔は「10倍」ごとになっています）。ピンクの点線は入金額（元本）のラインです。</div>
-    </div>
 
     <div class="table-scroll">
       <table>
@@ -314,12 +301,9 @@
     </div>
 
     <div class="footnote">
-      ※ 手取り想定 = 残高 ×（1 − 出金リリース税率）×（1 − 売却税）で計算しています。<br>
-      ※ <strong>ステーキング</strong>：実際のステーキング画面で確認された期間利回り（1日0.80%／30日28.24%／90日112.23%／180日341.99%／360日1,753.72%／540日7,524.42%）を通る曲線（対数線形補間）です。540日超は同条件で乗り換える（ロールオーバー）前提で540日サイクルを繰り返します。割引はありません。<br>
-      ※ <strong>債券バーン</strong>：ボンド一覧画面で確認された期間利回り（180日419.02%／360日2,346.21%）をそのまま使っています。割引購入の効果はこの数字にすでに織り込まれているため、別枠での割引計算はしていません。<strong>540日以降の数値は未確認</strong>のため、360日サイクルを繰り返すと仮定した推定値です（実際の540日プランの割引率・期間利回りが分かれば、より正確な数値に置き換えられます）。<br>
-      ※ <strong>LPボンド</strong>：実績データがまだないため、暫定的に債券バーンと同じ曲線を流用しています。実際の割引率・期間利回りが分かり次第、専用の数値に置き換えます。<br>
-      ※ 「手動レート入力」モードは簡易近似（リベース率の複利計算＋540日到達時に含み益へ+45%を一括加算）です。<br>
-      ※ ストレステストは「レートが今より○%下がり続けた場合」の下振れ確認用です。累積倍率の対数を割り引く形で反映しています。0%＝現状カーブ据え置きの試算です。
+      ※ 手取り想定 = 入金額 +（残高 − 入金額）×（1 − 出金リリース税率）で計算しています。入金額（元本）部分には課税せず、増えた分（含み益）にのみ出金リリース税率を掛けています（出金リリース税率には売却税相当1%を一律で織り込み済み）。<br>
+      ※ <strong>運用元本</strong> = 初期入金額 × 1.25（固定倍率）。この運用元本に対してリベース率（%/12時間）で複利計算しています：運用元本 ×（1+リベース率）^(2×経過日数)。<br>
+      ※ <strong>ランク報酬</strong>：V3 Proコミュニティ管理報酬（V1〜V15、+15%〜+155%）を選択すると、その分だけ複利の伸び率を底上げします。公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。ランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、この設定は「そのランクを維持できた場合」の理論値です。
     </div>
   </div>
 
@@ -568,8 +552,8 @@ function recalcCard1(){
   document.getElementById('totalUsd').textContent = "≈ " + fmtUSD(total / fx);
 }
 
-// 実際のリリースプール画面で確認された段階（7日=15%は実受取で確認済み。30日=5%/45日=1%は運営資料ベースで未確認。15日はデータなしのため7日〜30日の間で線形補間）
-const RELEASE_TAX_ANCHORS = [[7,0.15],[30,0.05],[45,0.01]];
+// 実際のリリースプール画面で確認された段階（7日=15%は実受取で確認済み。30日=5%/45日=1%は運営資料ベースで未確認。15日はデータなしのため7日〜30日の間で線形補間）に、売却税相当1%を一律で織り込み済み
+const RELEASE_TAX_ANCHORS = [[7,0.16],[30,0.06],[45,0.02]];
 function releaseTaxFor(days){
   const d = Math.min(Math.max(days, RELEASE_TAX_ANCHORS[0][0]), RELEASE_TAX_ANCHORS[RELEASE_TAX_ANCHORS.length-1][0]);
   for(let i=0;i<RELEASE_TAX_ANCHORS.length-1;i++){
@@ -581,103 +565,41 @@ function releaseTaxFor(days){
   return RELEASE_TAX_ANCHORS[RELEASE_TAX_ANCHORS.length-1][1];
 }
 
-// 各商品ごとの実績期間利回りアンカー（日数 -> 累積倍率、入金額そのものに対する倍率）
-// ステーキング：ステーキング画面の期間利回りをそのまま使用（割引なし）
-const STAKE_ANCHORS = [
-  [0, 1],
-  [1, 1.0080],
-  [30, 1.2824],
-  [90, 2.1223],
-  [180, 4.4199],
-  [360, 18.5372],
-  [540, 76.2442]
-];
-// 債券バーン：ボンド一覧画面の期間利回り（割引購入の効果は既に織り込み済み）。540日以降は未確認のため360日サイクルのロールオーバーで推定
-const BOND_BURN_ANCHORS = [
-  [0, 1],
-  [180, 5.1902],
-  [360, 24.4621]
-];
-// LPボンド：実績データ未取得のため、暫定的に債券バーンと同じ曲線を流用
-const LP_BOND_ANCHORS = BOND_BURN_ANCHORS;
-
-const PRODUCT_CONFIG = {
-  staking:  {anchors: STAKE_ANCHORS,     cycleDays: 540, label: "ステーキング実績カーブ（1〜540日、割引なし）"},
-  bondburn: {anchors: BOND_BURN_ANCHORS, cycleDays: 360, label: "債券バーン実績カーブ（180日・360日実績／540日以降は360日サイクルの推定）"},
-  lpbond:   {anchors: LP_BOND_ANCHORS,   cycleDays: 360, label: "LPボンド（実績データ未取得のため債券バーンの数値で暫定近似）"}
-};
-
-function interpLogLinear(anchors, d){
-  if(d <= 0) return 1;
-  for(let i=0;i<anchors.length-1;i++){
-    const [d0,m0] = anchors[i], [d1,m1] = anchors[i+1];
-    if(d >= d0 && d <= d1){
-      if(d1 === d0) return m1;
-      const t = (d - d0) / (d1 - d0);
-      const logm = Math.log(m0) + t * (Math.log(m1) - Math.log(m0));
-      return Math.exp(logm);
-    }
-  }
-  return anchors[anchors.length-1][1];
-}
-
-function anchorMultiplier(days, stressFrac, anchors, cycleDays){
-  const cycles = Math.floor(days / cycleDays);
-  const rem = days - cycles * cycleDays;
-  const fullCycleM = interpLogLinear(anchors, cycleDays);
-  const remM = interpLogLinear(anchors, rem);
-  let raw = Math.pow(fullCycleM, cycles) * remM;
-  if(stressFrac > 0){
-    raw = Math.exp(Math.log(raw) * (1 - stressFrac));
-  }
-  return raw;
-}
+const WORKING_PRINCIPAL_MULT = 1.25;
 
 function recalcCard2(){
   const principal = parseFloat(document.getElementById('principal').value) || 0;
-
-  const productType = document.getElementById('productType').value;
-  document.getElementById('manualRateWrap').style.display = (productType === 'manual') ? '' : 'none';
-  document.getElementById('manualBonusWrap').style.display = (productType === 'manual') ? '' : 'none';
+  const workingPrincipal = principal * WORKING_PRINCIPAL_MULT;
+  document.getElementById('workingPrincipal').value = workingPrincipal ? workingPrincipal.toFixed(2) : "";
 
   const rebaseRate = (parseFloat(document.getElementById('rebaseRate').value) || 0) / 100;
   const simDays = parseInt(document.getElementById('simDays').value) || 0;
   const releaseDays = parseInt(document.getElementById('releaseDays').value) || 7;
-  const sellTax = (parseFloat(document.getElementById('sellTax').value) || 0) / 100;
-  const bonusEnabled = document.getElementById('bonusEnabled').value === "1";
-  const stress = parseFloat(document.getElementById('stress').value) || 0;
+  const rankBonusFrac = parseFloat(document.getElementById('rankBonus').value) || 0;
   const fx = parseFloat(document.getElementById('fxRate').value) || 1;
 
-  document.getElementById('stressOut').textContent = stress + "%";
-  document.getElementById('effectivePrincipal').textContent = PRODUCT_CONFIG[productType] ? PRODUCT_CONFIG[productType].label : "手動レート入力";
+  document.getElementById('effectivePrincipal').textContent = `運用元本 ${fmtUSD(workingPrincipal)}／リベース率 ${(rebaseRate*100).toFixed(2)}%/12時間`;
 
-  const effRate = rebaseRate * (1 - stress/100);
+  const effRate = rebaseRate * (1 + rankBonusFrac);
   const releaseTax = releaseTaxFor(releaseDays);
 
   function balanceAtDay(days){
-    let balance;
-    const cfg = PRODUCT_CONFIG[productType];
-    if(cfg){
-      balance = principal * anchorMultiplier(days, stress/100, cfg.anchors, cfg.cycleDays);
-    } else {
-      balance = principal * Math.pow(1 + effRate, 2 * days);
-      if(bonusEnabled && days >= 540){
-        const profitAt540 = principal * Math.pow(1 + effRate, 2*540) - principal;
-        const bonusAmount = profitAt540 * 0.45;
-        const daysAfter540 = days - 540;
-        balance = (principal + profitAt540 + bonusAmount) * Math.pow(1 + effRate, 2*daysAfter540);
-      }
-    }
-    return balance;
+    return workingPrincipal * Math.pow(1 + effRate, 2 * days);
   }
 
-  const checkpoints = [30,90,180,270,365,540,730].filter(d => d <= Math.max(simDays,30));
-  if(!checkpoints.includes(simDays) && simDays>0) checkpoints.push(simDays);
-  checkpoints.sort((a,b)=>a-b);
+  function netFromBalance(balance, taxRate){
+    const gain = Math.max(balance - principal, 0);
+    return principal + gain * (1 - taxRate);
+  }
+
+  const maxTableDays = Math.min(Math.max(simDays,30), 730);
+  const checkpoints = [];
+  for(let d=30; d<=maxTableDays; d+=30) checkpoints.push(d);
+  if(!checkpoints.includes(maxTableDays)) checkpoints.push(maxTableDays);
 
   const rows = checkpoints.map(days => {
     const balance = balanceAtDay(days);
-    const net = balance * (1 - releaseTax) * (1 - sellTax);
+    const net = netFromBalance(balance, releaseTax);
     const netJpy = net * fx;
     return {days, balance, net, netJpy};
   });
@@ -691,51 +613,30 @@ function recalcCard2(){
     tbody.appendChild(tr);
   });
 
-  const chartN = 90;
-  const grossPts = [], netPts = [];
-  for(let i=0;i<=chartN;i++){
-    const d = simDays * i / chartN;
-    const bal = Math.max(balanceAtDay(d), 0.01);
-    const net = Math.max(bal * (1 - releaseTax) * (1 - sellTax), 0.01);
-    grossPts.push([d, bal]);
-    netPts.push([d, net]);
-  }
-
   // 元本回収（現在の設定）
   const MAX_SEARCH_DAYS = 3650;
-  const netAtDay = d => balanceAtDay(d) * (1 - releaseTax) * (1 - sellTax);
+  const netAtDay = d => netFromBalance(balanceAtDay(d), releaseTax);
   const breakevenDay = findBreakevenDay(netAtDay, principal, MAX_SEARCH_DAYS);
   const releaseLabelMap = {7:"7日",15:"15日",30:"30日",45:"45日"};
   if(breakevenDay == null){
     document.getElementById('breakevenHeadline').textContent = "10年以内に回収できません";
-    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、この設定（成長率・税率）では10年経っても手取りが上回りません。レート設定やストレステストを見直してください。`;
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、この設定（成長率・税率）では10年経っても手取りが上回りません。レート設定を見直してください。`;
   } else {
     document.getElementById('breakevenHeadline').textContent = fmtDaysSpan(breakevenDay);
-    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、リリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（税率${(releaseTax*100).toFixed(0)}%）＋売却税${(sellTax*100).toFixed(1)}%の設定で、手取りが上回る見込みの日数です。`;
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、リリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（税率${(releaseTax*100).toFixed(0)}%・売却税1%込み）の設定で、手取りが上回る見込みの日数です。`;
   }
 
   const beTbody = document.getElementById('breakevenTableBody');
   beTbody.innerHTML = "";
   [7,15,30,45].forEach(rd => {
     const rt = releaseTaxFor(rd);
-    const be = findBreakevenDay(d => balanceAtDay(d) * (1-rt) * (1-sellTax), principal, MAX_SEARCH_DAYS);
+    const be = findBreakevenDay(d => netFromBalance(balanceAtDay(d), rt), principal, MAX_SEARCH_DAYS);
     const tr = document.createElement('tr');
     const beLabel = be == null ? "10年以内に回収不可" : fmtDaysSpan(be);
     const isCurrent = rd === releaseDays;
     tr.innerHTML = `<td style="text-align:left;${isCurrent?'font-weight:800;color:var(--accent);':''}">${releaseLabelMap[rd]}${isCurrent?' ← 今の設定':''}</td><td>${(rt*100).toFixed(0)}%</td><td>${beLabel}</td>`;
     beTbody.appendChild(tr);
   });
-
-  const dayTickFmt = d => d>=365 ? Math.round(d/365*10)/10 + "年" : Math.round(d) + "日";
-  const principalLine = [[0, principal], [simDays, principal]];
-  const vlines = breakevenDay != null && breakevenDay <= simDays
-    ? [{x: breakevenDay, color: 'var(--pink)', label: '元本回収'}]
-    : [];
-  drawLineChart('card2Chart', [
-    {points: grossPts, color: 'var(--accent)'},
-    {points: netPts, color: '#00a186'},
-    {points: principalLine, color: 'var(--pink)', dashed:true}
-  ], {logScale:true, xFormatter: dayTickFmt, yFormatter: v => fmtUSD(v), vlines});
 }
 
 function recalcAll(){ recalcCard1(); recalcCard2(); }
