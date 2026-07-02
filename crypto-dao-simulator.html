@@ -984,12 +984,6 @@ renderLog();
 
 // ============ タブ切り替え（簡易版／詳細版） ============
 const TAB_KEY = 'cdao_sim_active_tab_v1';
-const DETAIL_UNLOCK_KEY = 'cdao_sim_detail_unlocked_v1';
-const DETAIL_PASSWORD = 'DAOにまにま';
-
-function isDetailUnlocked(){
-  return sessionStorage.getItem(DETAIL_UNLOCK_KEY) === '1';
-}
 
 function setActiveTab(tab){
   const isSimple = tab === 'simple';
@@ -1001,20 +995,8 @@ function setActiveTab(tab){
 }
 
 document.getElementById('tabBtnSimple').addEventListener('click', () => setActiveTab('simple'));
-document.getElementById('tabBtnDetail').addEventListener('click', () => {
-  if(isDetailUnlocked()){
-    setActiveTab('detail');
-    return;
-  }
-  const input = window.prompt('詳細版を見るにはパスワードを入力してください');
-  if(input === DETAIL_PASSWORD){
-    sessionStorage.setItem(DETAIL_UNLOCK_KEY, '1');
-    setActiveTab('detail');
-  } else if(input !== null){
-    window.alert('パスワードが違います。');
-  }
-});
-setActiveTab((localStorage.getItem(TAB_KEY) === 'detail' && isDetailUnlocked()) ? 'detail' : 'simple');
+document.getElementById('tabBtnDetail').addEventListener('click', () => setActiveTab('detail'));
+setActiveTab(localStorage.getItem(TAB_KEY) === 'detail' ? 'detail' : 'simple');
 </script>
 </body>
 </html>
