@@ -871,6 +871,9 @@ function recalcCard2(){
   const checkpoints = [];
   for(let d=30; d<=maxTableDays; d+=30) checkpoints.push(d);
   if(!checkpoints.includes(maxTableDays)) checkpoints.push(maxTableDays);
+  const showBreakevenRow = (reinvestStyle === 'recover' && breakevenDay != null && breakevenDay <= maxTableDays);
+  if(showBreakevenRow && !checkpoints.includes(breakevenDay)) checkpoints.push(breakevenDay);
+  checkpoints.sort((a,b) => a-b);
 
   const rows = checkpoints.map(days => {
     const balance = balanceStyled(days);
@@ -883,14 +886,26 @@ function recalcCard2(){
   tbody.innerHTML = "";
   let prevNet = principal;
   rows.forEach(r => {
-    const monthLabel = (r.days % 30 === 0) ? (r.days/30 + "ヶ月") : (r.days + "日");
+    const isBreakevenRow = showBreakevenRow && r.days === breakevenDay;
+    const monthLabel = isBreakevenRow
+      ? `💰 ${fmtDaysSpan(breakevenDay)}`
+      : ((r.days % 30 === 0) ? (r.days/30 + "ヶ月") : (r.days + "日"));
     const monthlyUsd = Math.max(r.net - prevNet, 0); // その区間で増えた手取り(USD)
     prevNet = r.net;
     const matched = findRankForMonthlyUSD(monthlyUsd);
     const rankLabel = matched ? `${matched.rank}相当` : "V1未満";
     const tr = document.createElement('tr');
+    if(isBreakevenRow){
+      tr.style.background = 'linear-gradient(120deg,#fff4d6,#ffe4ec)';
+      tr.style.fontWeight = '800';
+    }
     tr.innerHTML = `<td>${monthLabel}</td><td class="gross">${fmtUSD(r.balance)}</td><td class="net">${fmtUSD(r.net)}</td><td>${fmtJPY(r.netJpy)}</td><td style="font-weight:700;color:var(--accent);">${rankLabel}</td>`;
     tbody.appendChild(tr);
+    if(isBreakevenRow){
+      const noteTr = document.createElement('tr');
+      noteTr.innerHTML = `<td colspan="5" style="text-align:left;background:#fff4d6;color:#8a6300;font-weight:700;font-size:12px;padding:6px 8px;">🔒 ここで入金額 ${fmtUSD(principal)} を税引き後ちょうど1回だけ引き出しました。これ以降は残り（まだ未解放だったボンド元本分）だけを複利継続しています。</td>`;
+      tbody.appendChild(noteTr);
+    }
   });
 
   const releaseLabelMap = {7:"7日",15:"15日",30:"30日",45:"45日"};
