@@ -365,7 +365,7 @@
       ※ <strong>運用元本</strong> = 初期入金額 × 1.25（固定倍率）。この運用元本に対してリベース率（%/12時間）で複利計算しています：運用元本 ×（1+リベース率）^(2×経過日数)。1.25倍分は「ボンド購入時に元本へ即時プラスされる、あなたの資産としては確定しているが、現金化にはボンド期間分の解放が必要な部分」という位置づけです。<br>
       ※ <strong>ランク報酬スケジュール</strong>：「この日からVランク」という行を複数追加でき、日数の区間ごとに違うランクのボーナス（+15%〜+155%）を複利計算に反映できます。将来ランクが上がっていく想定を織り込みたい場合に使ってください。公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。ランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、この設定は「そのスケジュール通りにランクを維持できた場合」の理論値です。<br>
       ※ <strong>月換算ランク目安</strong>：その月に増えた手取り額（USD）が、公式ランク早見表の「最低月収」を満たす最高ランクを表示しているだけです。実際にそのランクの直紹介・組織条件（紹介人数や組織売上）を満たしているかどうかは反映していないので、あくまで金額の目安です。表の一番右（期間の端数日）は30日に満たない区間の実額なので、他の行より低めに出ます。<br>
-      ※ <strong>運用スタイル</strong>：「全額再投資」は現金化を考えず、増えた分から出金税（claim税）だけ引いてそのままPROで再投資し続ける前提です（USDTに売らないので売却税・ボンド解放スケジュールは関係なく、「手取り想定」欄はほぼ「税引き後もそのまま複利で回っている場合の評価額」になります）。「元本回収型」は、元本回収日（上の「元本回収の目安」の日数、こちらは実際に現金化する場合の税・ボンド解放スケジュールを織り込んだ計算）までは全額再投資と同じ動きをし、その日以降は入金額と同額を手元に確保したものとして扱い、残った含み益部分だけを引き続き同じ成長率で複利運用する前提です。
+      ※ <strong>運用スタイル</strong>：「全額再投資」は現金化を考えず、増えた分から出金税（claim税）だけ引いてそのままPROで再投資し続ける前提です（USDTに売らないので売却税・ボンド解放スケジュールは関係なく、「手取り想定」欄はほぼ「税引き後もそのまま複利で回っている場合の評価額」になります）。「元本回収型」は、元本回収日（上の「元本回収の目安」の日数、こちらは実際に現金化する場合の税・ボンド解放スケジュールを織り込んだ計算）までは全額再投資と同じ動きをし、回収日に「税引き後ちょうど入金額」を1回だけ引き出します。その時点で解放済みの運用元本と含み益を使い切っている前提なので、残るのは「まだ解放されていなかったボンド元本」部分だけになり、それを以降は全額再投資と同じ低摩擦モデル（都度claim税のみ、売却税やボンド解放スケジュールは以後考慮しない）で複利運用します。何度も売却税・ボンド解放の計算をやり直さない分、全額再投資の残高カーブに近い伸び方になります。
     </div>
   </div>
 
@@ -837,18 +837,21 @@ function recalcCard2(){
   const breakevenDay = findBreakevenDay(d => netFromDay(d, releaseTax), principal, MAX_SEARCH_DAYS);
 
   const reinvestStyle = document.getElementById('reinvestStyle').value;
-  const balanceAtBreakeven = (breakevenDay != null) ? balanceAtDay(breakevenDay) : null;
-  const remainingBaseAtBreakeven = balanceAtBreakeven != null ? Math.max(balanceAtBreakeven - principal, 0) : null;
+  // 回収日に「税引き後ちょうど入金額」を1回だけ引き出す。その時点で「解放済みの運用元本」＋「その日までの含み益」の
+  // 両方を使い切って入金額ぴったりを作っている前提なので、残るのは「まだ解放されていないボンド元本」部分だけ。
+  // これを、以後は全額再投資と同じ低摩擦モデル（都度claim税のみ、売却税やボンド解放は再度考えない）で回し続ける。
+  const releasedFractionAtBreakeven = (breakevenDay != null) ? Math.min(breakevenDay / bondTermDays, 1) : null;
+  const remainderGrossAtBreakeven = (breakevenDay != null) ? workingPrincipal * (1 - releasedFractionAtBreakeven) : null;
+  const claimTaxedBaseAtBreakeven = (breakevenDay != null) ? balanceAtDayClaimTaxed(breakevenDay, releaseTax) : null;
 
   // 全額再投資：現金化を考えず、都度の増加分からclaim税（出金税と同じ税率）だけ引いてすぐPROで再投資し続ける想定（売却税・ボンド解放スケジュールは対象外）
-  // 元本回収型：回収日までは全額再投資と同じ。回収日以降は「元本は手元に確保済み」とし、
-  // 残った分（含み益の元手）だけを、それ以降の相対成長率でそのまま複利で回し続ける
+  // 元本回収型：回収日までは全額再投資と同じ。回収日に入金額ぴったりを1回だけ抜き、残り（まだ未解放だったボンド元本分）を
+  // 以後は全額再投資と同じ低摩擦モデルで複利継続する（＝何度も売却税・ボンド解放を計算し直さない）
   function netStyled(days, taxRate){
     if(reinvestStyle === 'recover' && breakevenDay != null && days > breakevenDay){
-      const growthSinceBreakeven = balanceAtDay(days) / balanceAtBreakeven;
-      const grownRemainder = remainingBaseAtBreakeven * growthSinceBreakeven;
-      const remainderCash = grownRemainder * (1 - taxRate) * (1 - SELL_TAX);
-      return principal + remainderCash;
+      const growthSinceBreakeven = balanceAtDayClaimTaxed(days, taxRate) / claimTaxedBaseAtBreakeven;
+      const grownRemainder = remainderGrossAtBreakeven * growthSinceBreakeven;
+      return principal + grownRemainder;
     }
     if(reinvestStyle === 'full'){
       return balanceAtDayClaimTaxed(days, taxRate);
@@ -857,8 +860,8 @@ function recalcCard2(){
   }
   function balanceStyled(days){
     if(reinvestStyle === 'recover' && breakevenDay != null && days > breakevenDay){
-      const growthSinceBreakeven = balanceAtDay(days) / balanceAtBreakeven;
-      return principal + remainingBaseAtBreakeven * growthSinceBreakeven;
+      const growthSinceBreakeven = balanceAtDay(days) / balanceAtDay(breakevenDay);
+      return principal + remainderGrossAtBreakeven * growthSinceBreakeven;
     }
     return balanceAtDay(days);
   }
