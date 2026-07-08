@@ -298,6 +298,13 @@
           <option value="45">45日（出金税1%・運営資料ベース/未確認）</option>
         </select>
       </div>
+      <div class="field">
+        <label>運用スタイル</label>
+        <select id="reinvestStyle">
+          <option value="full" selected>全額再投資（ずっと複利で回し続ける）</option>
+          <option value="recover">元本回収型（元本回収後は含み益だけ再投資）</option>
+        </select>
+      </div>
     </div>
 
     <div class="field" style="margin-top:12px;">
@@ -357,7 +364,8 @@
       ※ 手取り想定は、解放ルートが異なる2つの合計です。①<strong>運用元本（入金額×1.25）そのもの</strong>は、ボンド期間（デフォルト540日）にわたって線形に解放されると仮定（実績画面の「リリース中2.11%」が経過日数の割合とほぼ一致していたことから）。解放された分だけ売却税1%を引いて手取りに計上します。②運用元本を<strong>上回った含み益（リベースで増えた分）</strong>は、ボンドの解放を待たずに出金税（7〜45日ベスティング）＋売却税1%を引けばすぐ手取りに計上できます（実際のブロック報酬受取画面の挙動と一致）。入金直後（day0）はまだ①も②も解放されていないため、手取りは0からスタートします。<br>
       ※ <strong>運用元本</strong> = 初期入金額 × 1.25（固定倍率）。この運用元本に対してリベース率（%/12時間）で複利計算しています：運用元本 ×（1+リベース率）^(2×経過日数)。1.25倍分は「ボンド購入時に元本へ即時プラスされる、あなたの資産としては確定しているが、現金化にはボンド期間分の解放が必要な部分」という位置づけです。<br>
       ※ <strong>ランク報酬スケジュール</strong>：「この日からVランク」という行を複数追加でき、日数の区間ごとに違うランクのボーナス（+15%〜+155%）を複利計算に反映できます。将来ランクが上がっていく想定を織り込みたい場合に使ってください。公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。ランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、この設定は「そのスケジュール通りにランクを維持できた場合」の理論値です。<br>
-      ※ <strong>月換算ランク目安</strong>：その月に増えた手取り額（USD）が、公式ランク早見表の「最低月収」を満たす最高ランクを表示しているだけです。実際にそのランクの直紹介・組織条件（紹介人数や組織売上）を満たしているかどうかは反映していないので、あくまで金額の目安です。表の一番右（期間の端数日）は30日に満たない区間の実額なので、他の行より低めに出ます。
+      ※ <strong>月換算ランク目安</strong>：その月に増えた手取り額（USD）が、公式ランク早見表の「最低月収」を満たす最高ランクを表示しているだけです。実際にそのランクの直紹介・組織条件（紹介人数や組織売上）を満たしているかどうかは反映していないので、あくまで金額の目安です。表の一番右（期間の端数日）は30日に満たない区間の実額なので、他の行より低めに出ます。<br>
+      ※ <strong>運用スタイル</strong>：「全額再投資」は元本回収後もずっと全額を複利で回し続ける前提です。「元本回収型」は、元本回収日（上の「元本回収の目安」の日数）までは全額再投資と全く同じ動きをし、その日以降は入金額と同額を手元に確保したものとして扱い（以後は税や相場変動の対象外）、残った含み益部分だけを引き続き同じ成長率で複利運用する前提です。回収日以降の残高・手取りは「元本回収型」の方が「全額再投資」より小さく出ます（元本相当分がもう複利の対象から外れるため）。
     </div>
   </div>
 
@@ -807,14 +815,41 @@ function recalcCard2(){
     return principalCash + gainCash;
   }
 
+  // 元本回収（現在の設定）※スタイルに関わらず「回収するまでの日数」は共通（全額再投資型と同じ計算）
+  const MAX_SEARCH_DAYS = 3650;
+  const breakevenDay = findBreakevenDay(d => netFromDay(d, releaseTax), principal, MAX_SEARCH_DAYS);
+
+  const reinvestStyle = document.getElementById('reinvestStyle').value;
+  const balanceAtBreakeven = (breakevenDay != null) ? balanceAtDay(breakevenDay) : null;
+  const remainingBaseAtBreakeven = balanceAtBreakeven != null ? Math.max(balanceAtBreakeven - principal, 0) : null;
+
+  // 元本回収型：回収日までは全額再投資と同じ。回収日以降は「元本は手元に確保済み」とし、
+  // 残った分（含み益の元手）だけを、それ以降の相対成長率でそのまま複利で回し続ける
+  function netStyled(days, taxRate){
+    if(reinvestStyle !== 'recover' || breakevenDay == null || days <= breakevenDay){
+      return netFromDay(days, taxRate);
+    }
+    const growthSinceBreakeven = balanceAtDay(days) / balanceAtBreakeven;
+    const grownRemainder = remainingBaseAtBreakeven * growthSinceBreakeven;
+    const remainderCash = grownRemainder * (1 - taxRate) * (1 - SELL_TAX);
+    return principal + remainderCash;
+  }
+  function balanceStyled(days){
+    if(reinvestStyle !== 'recover' || breakevenDay == null || days <= breakevenDay){
+      return balanceAtDay(days);
+    }
+    const growthSinceBreakeven = balanceAtDay(days) / balanceAtBreakeven;
+    return principal + remainingBaseAtBreakeven * growthSinceBreakeven;
+  }
+
   const maxTableDays = Math.min(Math.max(simDays,30), 730);
   const checkpoints = [];
   for(let d=30; d<=maxTableDays; d+=30) checkpoints.push(d);
   if(!checkpoints.includes(maxTableDays)) checkpoints.push(maxTableDays);
 
   const rows = checkpoints.map(days => {
-    const balance = balanceAtDay(days);
-    const net = netFromDay(days, releaseTax);
+    const balance = balanceStyled(days);
+    const net = netStyled(days, releaseTax);
     const netJpy = net * fx;
     return {days, balance, net, netJpy};
   });
@@ -833,17 +868,14 @@ function recalcCard2(){
     tbody.appendChild(tr);
   });
 
-  // 元本回収（現在の設定）
-  const MAX_SEARCH_DAYS = 3650;
-  const netAtDay = d => netFromDay(d, releaseTax);
-  const breakevenDay = findBreakevenDay(netAtDay, principal, MAX_SEARCH_DAYS);
   const releaseLabelMap = {7:"7日",15:"15日",30:"30日",45:"45日"};
+  const styleNote = reinvestStyle === 'recover' ? "（回収日以降は元本を確保し、含み益部分だけ複利継続の前提）" : "（全額を回収日以降もずっと複利継続）";
   if(breakevenDay == null){
     document.getElementById('breakevenHeadline').textContent = "10年以内に回収できません";
     document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、この設定（成長率・税率・ボンド期間）では10年経っても手取りが上回りません。レート設定を見直してください。`;
   } else {
     document.getElementById('breakevenHeadline').textContent = fmtDaysSpan(breakevenDay);
-    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、①運用元本(${fmtUSD(workingPrincipal)})がボンド期間${bondTermDays}日で線形に解放され、②含み益はリリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（出金税${(releaseTax*100).toFixed(0)}%）ですぐ引き出せる、という前提で、売却税${(SELL_TAX*100).toFixed(0)}%を差し引いた手取りが入金額を上回る見込みの日数です。`;
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、①運用元本(${fmtUSD(workingPrincipal)})がボンド期間${bondTermDays}日で線形に解放され、②含み益はリリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（出金税${(releaseTax*100).toFixed(0)}%）ですぐ引き出せる、という前提で、売却税${(SELL_TAX*100).toFixed(0)}%を差し引いた手取りが入金額を上回る見込みの日数です${styleNote}。`;
   }
 
   const beTbody = document.getElementById('breakevenTableBody');
