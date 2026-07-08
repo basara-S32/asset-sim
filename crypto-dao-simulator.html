@@ -282,6 +282,10 @@
         <input type="number" id="rebaseRate" value="0.4" min="0" step="any">
       </div>
       <div class="field">
+        <label>ボンド期間（運用元本1.25倍分が解放される日数）</label>
+        <input type="number" id="bondTermDays" value="540" min="1" step="1">
+      </div>
+      <div class="field">
         <label>シミュレーション期間（日）</label>
         <input type="number" id="simDays" value="730" step="1">
       </div>
@@ -350,8 +354,8 @@
     </div>
 
     <div class="footnote">
-      ※ 手取り想定は2段階で計算しています。①含み益（残高−入金額）にのみ出金税をかけて手取り分を出す（入金額そのものには出金税をかけません＝実際の受取画面の挙動と一致）。②「入金額＋①の手取り分」の合計に、売却税1%をかけます（PROを売却する際は元本相当分も含めた全体に税がかかるため）。<br>
-      ※ <strong>運用元本</strong> = 初期入金額 × 1.25（固定倍率）。この運用元本に対してリベース率（%/12時間）で複利計算しています：運用元本 ×（1+リベース率）^(2×経過日数)。<br>
+      ※ 手取り想定は、解放ルートが異なる2つの合計です。①<strong>運用元本（入金額×1.25）そのもの</strong>は、ボンド期間（デフォルト540日）にわたって線形に解放されると仮定（実績画面の「リリース中2.11%」が経過日数の割合とほぼ一致していたことから）。解放された分だけ売却税1%を引いて手取りに計上します。②運用元本を<strong>上回った含み益（リベースで増えた分）</strong>は、ボンドの解放を待たずに出金税（7〜45日ベスティング）＋売却税1%を引けばすぐ手取りに計上できます（実際のブロック報酬受取画面の挙動と一致）。入金直後（day0）はまだ①も②も解放されていないため、手取りは0からスタートします。<br>
+      ※ <strong>運用元本</strong> = 初期入金額 × 1.25（固定倍率）。この運用元本に対してリベース率（%/12時間）で複利計算しています：運用元本 ×（1+リベース率）^(2×経過日数)。1.25倍分は「ボンド購入時に元本へ即時プラスされる、あなたの資産としては確定しているが、現金化にはボンド期間分の解放が必要な部分」という位置づけです。<br>
       ※ <strong>ランク報酬スケジュール</strong>：「この日からVランク」という行を複数追加でき、日数の区間ごとに違うランクのボーナス（+15%〜+155%）を複利計算に反映できます。将来ランクが上がっていく想定を織り込みたい場合に使ってください。公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。ランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、この設定は「そのスケジュール通りにランクを維持できた場合」の理論値です。<br>
       ※ <strong>月換算ランク目安</strong>：その月に増えた手取り額（USD）が、公式ランク早見表の「最低月収」を満たす最高ランクを表示しているだけです。実際にそのランクの直紹介・組織条件（紹介人数や組織売上）を満たしているかどうかは反映していないので、あくまで金額の目安です。表の一番右（期間の端数日）は30日に満たない区間の実額なので、他の行より低めに出ます。
     </div>
@@ -765,6 +769,7 @@ function recalcCard2(){
   document.getElementById('workingPrincipal').value = workingPrincipal ? workingPrincipal.toFixed(2) : "";
 
   const rebaseRate = Math.max(0, parseFloat(document.getElementById('rebaseRate').value) || 0) / 100;
+  const bondTermDays = Math.max(1, parseInt(document.getElementById('bondTermDays').value) || 540);
   const simDays = parseInt(document.getElementById('simDays').value) || 0;
   const releaseDays = parseInt(document.getElementById('releaseDays').value) || 7;
   const fx = parseFloat(document.getElementById('fxRate').value) || 1;
@@ -790,10 +795,16 @@ function recalcCard2(){
     return balance;
   }
 
-  function netFromBalance(balance, taxRate){
-    const gain = Math.max(balance - principal, 0);
-    const afterReleaseTax = principal + gain * (1 - taxRate);
-    return afterReleaseTax * (1 - SELL_TAX);
+  // 手取りは2つの独立した解放ルートの合計
+  // ①運用元本(1.25倍込み)そのもの：ボンド期間にわたって線形に解放される（実績「リリース中2.11%」≒経過日数/540日と近い値だったことから線形と仮定）
+  // ②運用元本を上回った含み益（リベースで増えた分）：ボンドの解放とは別に、7〜45日ベスティングですぐ引き出せる（実際のブロック報酬受取画面の挙動と一致）
+  function netFromDay(days, taxRate){
+    const balance = balanceAtDay(days);
+    const releasedFraction = Math.min(days / bondTermDays, 1);
+    const principalCash = workingPrincipal * releasedFraction * (1 - SELL_TAX);
+    const gain = Math.max(balance - workingPrincipal, 0);
+    const gainCash = gain * (1 - taxRate) * (1 - SELL_TAX);
+    return principalCash + gainCash;
   }
 
   const maxTableDays = Math.min(Math.max(simDays,30), 730);
@@ -803,7 +814,7 @@ function recalcCard2(){
 
   const rows = checkpoints.map(days => {
     const balance = balanceAtDay(days);
-    const net = netFromBalance(balance, releaseTax);
+    const net = netFromDay(days, releaseTax);
     const netJpy = net * fx;
     return {days, balance, net, netJpy};
   });
@@ -824,22 +835,22 @@ function recalcCard2(){
 
   // 元本回収（現在の設定）
   const MAX_SEARCH_DAYS = 3650;
-  const netAtDay = d => netFromBalance(balanceAtDay(d), releaseTax);
+  const netAtDay = d => netFromDay(d, releaseTax);
   const breakevenDay = findBreakevenDay(netAtDay, principal, MAX_SEARCH_DAYS);
   const releaseLabelMap = {7:"7日",15:"15日",30:"30日",45:"45日"};
   if(breakevenDay == null){
     document.getElementById('breakevenHeadline').textContent = "10年以内に回収できません";
-    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、この設定（成長率・税率）では10年経っても手取りが上回りません。レート設定を見直してください。`;
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、この設定（成長率・税率・ボンド期間）では10年経っても手取りが上回りません。レート設定を見直してください。`;
   } else {
     document.getElementById('breakevenHeadline').textContent = fmtDaysSpan(breakevenDay);
-    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、リリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（含み益に出金税${(releaseTax*100).toFixed(0)}%）＋売却時に合計額へ売却税${(SELL_TAX*100).toFixed(0)}%、の2段階を差し引いた場合に手取りが上回る見込みの日数です。`;
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、①運用元本(${fmtUSD(workingPrincipal)})がボンド期間${bondTermDays}日で線形に解放され、②含み益はリリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（出金税${(releaseTax*100).toFixed(0)}%）ですぐ引き出せる、という前提で、売却税${(SELL_TAX*100).toFixed(0)}%を差し引いた手取りが入金額を上回る見込みの日数です。`;
   }
 
   const beTbody = document.getElementById('breakevenTableBody');
   beTbody.innerHTML = "";
   [7,15,30,45].forEach(rd => {
     const rt = releaseTaxFor(rd);
-    const be = findBreakevenDay(d => netFromBalance(balanceAtDay(d), rt), principal, MAX_SEARCH_DAYS);
+    const be = findBreakevenDay(d => netFromDay(d, rt), principal, MAX_SEARCH_DAYS);
     const tr = document.createElement('tr');
     const beLabel = be == null ? "10年以内に回収不可" : fmtDaysSpan(be);
     const isCurrent = rd === releaseDays;
