@@ -308,6 +308,14 @@
     </div>
 
     <div class="field" style="margin-top:12px;">
+      <label>ランク報酬スケジュールの決め方</label>
+      <select id="rankMode">
+        <option value="manual" selected>手動（自分で日数とランクを指定）</option>
+        <option value="auto">自動（残高が組織売上条件を超えたら自動で昇格）</option>
+      </select>
+    </div>
+
+    <div class="field" id="rankScheduleWrap" style="margin-top:12px;">
       <label>ランク報酬スケジュール（V3 Proコミュニティ管理報酬・昇格予定を日数で反映）</label>
       <div class="table-scroll">
         <table id="rankScheduleTable">
@@ -363,7 +371,7 @@
     <div class="footnote">
       ※ 手取り想定は、解放ルートが異なる2つの合計です。①<strong>運用元本（入金額×1.25）そのもの</strong>は、ボンド期間（デフォルト540日）にわたって線形に解放されると仮定（実績画面の「リリース中2.11%」が経過日数の割合とほぼ一致していたことから）。解放された分だけ売却税1%を引いて手取りに計上します。②運用元本を<strong>上回った含み益（リベースで増えた分）</strong>は、ボンドの解放を待たずに出金税（7〜45日ベスティング）＋売却税1%を引けばすぐ手取りに計上できます（実際のブロック報酬受取画面の挙動と一致）。入金直後（day0）はまだ①も②も解放されていないため、手取りは0からスタートします。<br>
       ※ <strong>運用元本</strong> = 初期入金額 × 1.25（固定倍率）。この運用元本に対してリベース率（%/12時間）で複利計算しています：運用元本 ×（1+リベース率）^(2×経過日数)。1.25倍分は「ボンド購入時に元本へ即時プラスされる、あなたの資産としては確定しているが、現金化にはボンド期間分の解放が必要な部分」という位置づけです。<br>
-      ※ <strong>ランク報酬スケジュール</strong>：「この日からVランク」という行を複数追加でき、日数の区間ごとに違うランクのボーナス（+15%〜+155%）を複利計算に反映できます。将来ランクが上がっていく想定を織り込みたい場合に使ってください。公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。ランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、この設定は「そのスケジュール通りにランクを維持できた場合」の理論値です。<br>
+      ※ <strong>ランク報酬スケジュール</strong>：「手動」では「この日からVランク」という行を複数追加でき、日数の区間ごとに違うランクのボーナス（+15%〜+155%）を複利計算に反映できます。「自動」では、残高（税引前）がランク早見表の組織売上条件を超えるたびに自動でランクが上がっていく前提でシミュレーションします（一度上がったランクは下がりません）。いずれも公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。実際のランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、「自動」モードも含め、あくまで「その通りにランクを維持・到達できた場合」の理論値です。<br>
       ※ <strong>ランク目安</strong>：その時点の残高（税引前）が、公式ランク早見表の「組織売上条件」の金額を超えているかどうかで、最高ランクを表示しています（一度超えたら以降下がりません）。実際の組織売上条件はダウンライン全体の売上が対象で、個人の残高とは本来別物ですが、規模感をつかむための目安として残高で代用しています。直紹介人数・組織条件（紹介人数など）を実際に満たしているかは反映していないので、あくまで金額規模の目安です。<br>
       ※ <strong>運用スタイル</strong>：「全額再投資」は現金化を考えず、増えた分から出金税（claim税）だけ引いてそのままPROで再投資し続ける前提です（USDTに売らないので売却税・ボンド解放スケジュールは関係なく、「手取り想定」欄はほぼ「税引き後もそのまま複利で回っている場合の評価額」になります）。「元本回収型」は、元本回収日（上の「元本回収の目安」の日数、こちらは実際に現金化する場合の税・ボンド解放スケジュールを織り込んだ計算）までは全額再投資と同じ動きをし、回収日に「税引き後ちょうど入金額」を1回だけ引き出します。その時点で解放済みの運用元本と含み益を使い切っている前提なので、残るのは「まだ解放されていなかったボンド元本」部分だけになり、それを以降は全額再投資と同じ低摩擦モデル（都度claim税のみ、売却税やボンド解放スケジュールは以後考慮しない）で複利運用します。何度も売却税・ボンド解放の計算をやり直さない分、全額再投資の残高カーブに近い伸び方になります。
     </div>
@@ -708,6 +716,25 @@ function findRankForBalance(balance){
   return matched;
 }
 
+// 「自動」モード用：残高が組織売上条件を超えるたびにランクが上がっていく前提で、日次シミュレーションから昇格スケジュール（segments形式）を組み立てる
+function buildAutoRankSegments(workingPrincipal, rebaseRate, maxDays){
+  const segments = [{day: 0, rank: 0}];
+  let balance = workingPrincipal;
+  let currentRank = (findRankForBalance(balance) || {bonus: 0}).bonus;
+  segments[0].rank = currentRank;
+  for(let day = 1; day <= maxDays; day++){
+    const effRate = rebaseRate * (1 + currentRank);
+    balance *= Math.pow(1 + effRate, 2);
+    const matched = findRankForBalance(balance);
+    const newRank = matched ? matched.bonus : 0;
+    if(newRank > currentRank){
+      currentRank = newRank;
+      segments.push({day, rank: currentRank});
+    }
+  }
+  return segments;
+}
+
 let rankSchedule = [{day: 0, rank: 0}];
 
 function renderRankSchedule(){
@@ -791,8 +818,15 @@ function recalcCard2(){
   const releaseDays = parseInt(document.getElementById('releaseDays').value) || 7;
   const fx = parseFloat(document.getElementById('fxRate').value) || 1;
 
-  const segments = rankSchedule.slice().sort((a,b) => a.day - b.day);
-  const rankSummary = segments.map(s => `${s.day/30}ヶ月〜${RANK_OPTIONS.find(o=>parseFloat(o.value)===s.rank)?.label || 'なし'}`).join(' / ');
+  const rankMode = document.getElementById('rankMode').value;
+  document.getElementById('rankScheduleWrap').style.display = (rankMode === 'auto') ? 'none' : '';
+  const MAX_SEARCH_DAYS_FOR_RANK = 3650;
+  const segments = (rankMode === 'auto')
+    ? buildAutoRankSegments(workingPrincipal, rebaseRate, MAX_SEARCH_DAYS_FOR_RANK)
+    : rankSchedule.slice().sort((a,b) => a.day - b.day);
+  const rankSummary = (rankMode === 'auto')
+    ? '自動昇格：' + segments.map(s => `${s.day}日〜${RANK_OPTIONS.find(o=>parseFloat(o.value)===s.rank)?.label || 'なし'}`).join(' / ')
+    : segments.map(s => `${s.day/30}ヶ月〜${RANK_OPTIONS.find(o=>parseFloat(o.value)===s.rank)?.label || 'なし'}`).join(' / ');
   document.getElementById('effectivePrincipal').textContent = `運用元本 ${fmtUSD(workingPrincipal)}／リベース率 ${(rebaseRate*100).toFixed(2)}%/12時間／${rankSummary}`;
 
   const releaseTax = releaseTaxFor(releaseDays);
