@@ -255,6 +255,7 @@
       </div>
       <div class="val" id="totalJpy">¥0</div>
     </div>
+    <div class="footnote" id="rankBadge1" style="text-align:right;font-weight:700;"></div>
   </div>
 
   </div><!-- /tabPanelSimple -->
@@ -306,6 +307,19 @@
       <button id="addRankRowBtn" type="button" class="btn" style="width:auto;padding:6px 14px;font-size:12.5px;margin-top:8px;">＋ 行を追加</button>
     </div>
 
+    <details style="margin-top:14px;">
+      <summary>🏆 ランク早見表（公式・報酬シミュレーション）を見る</summary>
+      <div class="table-scroll">
+        <table id="rankRefTable">
+          <thead>
+            <tr><th style="text-align:left;">ランク</th><th>個人</th><th>直紹介</th><th>組織条件</th><th>組織売上条件</th><th>ボーナス比率</th><th>最低月収(USD)</th><th>最低月収(JPY)</th></tr>
+          </thead>
+          <tbody id="rankRefBody"></tbody>
+        </table>
+      </div>
+      <div class="footnote">※ 公式の「報酬シミュレーション」表をそのまま転記したものです。組織条件・組織売上条件はダウンライン（紹介先の紹介先も含む組織全体）の達成が前提のため、個人の運用実績だけでは到達できないランクもあります。V11〜V15の「直紹介」列はV7〜V10と同じ表記が続く前提で転記しています（見づらい・違う場合は教えてください）。</div>
+    </details>
+
     <div class="result-row"><span class="label" id="productNoteLabel">運用元本・レート</span><span class="val" id="effectivePrincipal" style="font-size:12.5px;font-weight:700;"></span></div>
 
     <div class="total-box" style="background:linear-gradient(120deg,#fff4e0,#fff0f0);border-color:#ffe0b0;">
@@ -329,7 +343,7 @@
     <div class="table-scroll">
       <table>
         <thead>
-          <tr><th>経過</th><th>残高（税引前）</th><th>手取り想定（税引後）</th><th>円換算（手取り）</th></tr>
+          <tr><th>経過</th><th>残高（税引前）</th><th>手取り想定（税引後）</th><th>円換算（手取り）</th><th>月換算ランク目安</th></tr>
         </thead>
         <tbody id="projTableBody"></tbody>
       </table>
@@ -338,7 +352,8 @@
     <div class="footnote">
       ※ 手取り想定は2段階で計算しています。①含み益（残高−入金額）にのみ出金税をかけて手取り分を出す（入金額そのものには出金税をかけません＝実際の受取画面の挙動と一致）。②「入金額＋①の手取り分」の合計に、売却税1%をかけます（PROを売却する際は元本相当分も含めた全体に税がかかるため）。<br>
       ※ <strong>運用元本</strong> = 初期入金額 × 1.25（固定倍率）。この運用元本に対してリベース率（%/12時間）で複利計算しています：運用元本 ×（1+リベース率）^(2×経過日数)。<br>
-      ※ <strong>ランク報酬スケジュール</strong>：「この日からVランク」という行を複数追加でき、日数の区間ごとに違うランクのボーナス（+15%〜+155%）を複利計算に反映できます。将来ランクが上がっていく想定を織り込みたい場合に使ってください。公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。ランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、この設定は「そのスケジュール通りにランクを維持できた場合」の理論値です。
+      ※ <strong>ランク報酬スケジュール</strong>：「この日からVランク」という行を複数追加でき、日数の区間ごとに違うランクのボーナス（+15%〜+155%）を複利計算に反映できます。将来ランクが上がっていく想定を織り込みたい場合に使ってください。公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。ランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、この設定は「そのスケジュール通りにランクを維持できた場合」の理論値です。<br>
+      ※ <strong>月換算ランク目安</strong>：その月に増えた手取り額（USD）が、公式ランク早見表の「最低月収」を満たす最高ランクを表示しているだけです。実際にそのランクの直紹介・組織条件（紹介人数や組織売上）を満たしているかどうかは反映していないので、あくまで金額の目安です。表の一番右（期間の端数日）は30日に満たない区間の実額なので、他の行より低めに出ます。
     </div>
   </div>
 
@@ -585,6 +600,15 @@ function recalcCard1(){
   document.getElementById('r3').textContent = fmtJPY(r3);
   document.getElementById('totalJpy').textContent = fmtJPY(total);
   document.getElementById('totalUsd').textContent = "≈ " + fmtUSD(total / fx);
+
+  const rankBadgeEl = document.getElementById('rankBadge1');
+  if(rankBadgeEl && typeof findRankForMonthlyUSD === 'function'){
+    const monthlyUsd = total / fx;
+    const matched = findRankForMonthlyUSD(monthlyUsd);
+    rankBadgeEl.textContent = matched
+      ? `🏆 月換算 ${fmtUSD(monthlyUsd)}／月 ＝ ランク表の${matched.rank}（最低月収${fmtUSD(matched.minUsd)}）以上に相当`
+      : `月換算 ${fmtUSD(monthlyUsd)}／月 ＝ ランク表のV1未満（最低月収$225）`;
+  }
 }
 
 // 実際のリリースプール画面で確認された段階（7日=15%は実受取で確認済み。30日=5%/45日=1%は運営資料ベースで未確認。15日はデータなしのため7日〜30日の間で線形補間）。この税率は「引き出し可能なPRO（＝含み益部分）」に対してのみかかる（実際の受取画面 0.856/1.007129 PRO の挙動と一致）
@@ -622,6 +646,46 @@ const RANK_OPTIONS = [
   {value:"1.45", label:"V14（+145%）"},
   {value:"1.55", label:"V15（+155%）"}
 ];
+
+// 公式「報酬シミュレーション」表の転記（V11〜V15の「直紹介」列はV7〜V10と同じ表記が続く前提）
+const RANK_TABLE = [
+  {rank:"V1",  personal:"$100", direct:"-",         org:"-",       sales:5000,       bonus:0.15, minUsd:225,      minJpy:"約3.5万円"},
+  {rank:"V2",  personal:"$100", direct:"3アカウント", org:"-",       sales:15000,      bonus:0.25, minUsd:450,      minJpy:"約7万円"},
+  {rank:"V3",  personal:"$100", direct:"3アカウント", org:"-",       sales:45000,      bonus:0.35, minUsd:1350,     minJpy:"約20.9万円"},
+  {rank:"V4",  personal:"$100", direct:"5アカウント", org:"-",       sales:150000,     bonus:0.45, minUsd:4500,     minJpy:"約69.8万円"},
+  {rank:"V5",  personal:"$100", direct:"5アカウント", org:"-",       sales:400000,     bonus:0.55, minUsd:12000,    minJpy:"約186万円"},
+  {rank:"V6",  personal:"$100", direct:"5アカウント", org:"-",       sales:1050000,    bonus:0.65, minUsd:31500,    minJpy:"約488万円"},
+  {rank:"V7",  personal:"$100", direct:"10アカウント",org:"2名V6",   sales:2100000,    bonus:0.75, minUsd:63000,    minJpy:"約976.5万円"},
+  {rank:"V8",  personal:"$100", direct:"10アカウント",org:"2名V7",   sales:4200000,    bonus:0.85, minUsd:126000,   minJpy:"約1,953万円"},
+  {rank:"V9",  personal:"$100", direct:"10アカウント",org:"2名V8",   sales:8400000,    bonus:0.95, minUsd:252000,   minJpy:"約3,906万円"},
+  {rank:"V10", personal:"$100", direct:"10アカウント",org:"2名V9",   sales:16800000,   bonus:1.05, minUsd:504000,   minJpy:"約7,812万円"},
+  {rank:"V11", personal:"$100", direct:"10アカウント",org:"2名V10",  sales:33600000,   bonus:1.15, minUsd:1008000,  minJpy:"約1億5,624万円"},
+  {rank:"V12", personal:"$100", direct:"10アカウント",org:"2名V11",  sales:67200000,   bonus:1.25, minUsd:2016000,  minJpy:"約3億1,248万円"},
+  {rank:"V13", personal:"$100", direct:"10アカウント",org:"2名V12",  sales:134400000,  bonus:1.35, minUsd:4032000,  minJpy:"約6億2,496万円"},
+  {rank:"V14", personal:"$100", direct:"10アカウント",org:"2名V13",  sales:268800000,  bonus:1.45, minUsd:8064000,  minJpy:"約12億4,992万円"},
+  {rank:"V15", personal:"$100", direct:"10アカウント",org:"2名V14",  sales:537600000,  bonus:1.55, minUsd:16128000, minJpy:"約24億9,984万円"}
+];
+
+function renderRankRefTable(){
+  const tbody = document.getElementById('rankRefBody');
+  if(!tbody) return;
+  tbody.innerHTML = "";
+  RANK_TABLE.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="text-align:left;font-weight:700;">${r.rank}</td><td>${r.personal}</td><td>${r.direct}</td><td>${r.org}</td><td>${fmtUSD(r.sales)}</td><td>${(r.bonus*100).toFixed(0)}%</td><td>${fmtUSD(r.minUsd)}</td><td>${r.minJpy}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+renderRankRefTable();
+
+// 月換算の金額(USD)から、公式ランク表の「最低月収」を満たす最高ランクを探す（あくまで金額の目安の照合であり、直紹介・組織条件を満たしているとは限らない）
+function findRankForMonthlyUSD(usd){
+  let matched = null;
+  for(const r of RANK_TABLE){
+    if(usd >= r.minUsd) matched = r; else break;
+  }
+  return matched;
+}
 
 let rankSchedule = [{day: 0, rank: 0}];
 
@@ -746,10 +810,15 @@ function recalcCard2(){
 
   const tbody = document.getElementById('projTableBody');
   tbody.innerHTML = "";
+  let prevNet = principal;
   rows.forEach(r => {
     const monthLabel = (r.days % 30 === 0) ? (r.days/30 + "ヶ月") : (r.days + "日");
+    const monthlyUsd = Math.max(r.net - prevNet, 0); // その区間で増えた手取り(USD)
+    prevNet = r.net;
+    const matched = findRankForMonthlyUSD(monthlyUsd);
+    const rankLabel = matched ? `${matched.rank}相当` : "V1未満";
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${monthLabel}</td><td class="gross">${fmtUSD(r.balance)}</td><td class="net">${fmtUSD(r.net)}</td><td>${fmtJPY(r.netJpy)}</td>`;
+    tr.innerHTML = `<td>${monthLabel}</td><td class="gross">${fmtUSD(r.balance)}</td><td class="net">${fmtUSD(r.net)}</td><td>${fmtJPY(r.netJpy)}</td><td style="font-weight:700;color:var(--accent);">${rankLabel}</td>`;
     tbody.appendChild(tr);
   });
 
