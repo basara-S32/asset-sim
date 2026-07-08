@@ -287,10 +287,10 @@
       <div class="field">
         <label>出金リリース日数（税率に影響）</label>
         <select id="releaseDays">
-          <option value="7">7日（税率16%・実受取確認15%＋売却税1%込み）</option>
-          <option value="15">15日（税率 約13%・未確認/補間推定＋売却税1%込み）</option>
-          <option value="30">30日（税率6%・運営資料ベース5%＋売却税1%込み/未確認）</option>
-          <option value="45">45日（税率2%・運営資料ベース1%＋売却税1%込み/未確認）</option>
+          <option value="7">7日（出金税15%・実受取で確認済み）</option>
+          <option value="15">15日（出金税 約12%・未確認/補間推定）</option>
+          <option value="30">30日（出金税5%・運営資料ベース/未確認）</option>
+          <option value="45">45日（出金税1%・運営資料ベース/未確認）</option>
         </select>
       </div>
     </div>
@@ -323,7 +323,7 @@
       </table>
     </div>
     <div class="footnote">※ リリース日数が短いほど税率は高いですが早く現金化でき、長いほど税率は低い代わりに解放まで待つ必要があります。元本回収を急ぐか、手取り効率を優先するかの比較用です。<br>
-    ※ 7日＝出金リリース税率15%は実際の受取画面（0.856/1.007129 PRO など）で確認済みです。30日＝5%・45日＝1%は運営資料ベースで未確認、15日はデータがないため7日〜30日の間で線形補間した推定値です。表示中の税率にはこれらへ売却税相当1%を一律で加算済みです。<br>
+    ※ 7日＝出金税15%は実際の受取画面（0.856/1.007129 PRO など）で確認済みです。30日＝5%・45日＝1%は運営資料ベースで未確認、15日はデータがないため7日〜30日の間で線形補間した推定値です。これとは別に、売却時に合計額へ売却税1%がかかります（下記参照）。<br>
     ※ 実際の出金には、この後さらに「タービン」（PRO自動買い戻し、スリッページ1〜5%＋解放までの待ち時間）という工程があることが確認されていますが、そのコスト・所要日数は未確認のため、まだこの計算には含まれていません。実際の手取り額・回収日数はここで出る数値より悪化する可能性があります。</div>
 
     <div class="table-scroll">
@@ -336,7 +336,7 @@
     </div>
 
     <div class="footnote">
-      ※ 手取り想定 = 入金額 +（残高 − 入金額）×（1 − 出金リリース税率）で計算しています。入金額（元本）部分には課税せず、増えた分（含み益）にのみ出金リリース税率を掛けています（出金リリース税率には売却税相当1%を一律で織り込み済み）。<br>
+      ※ 手取り想定は2段階で計算しています。①含み益（残高−入金額）にのみ出金税をかけて手取り分を出す（入金額そのものには出金税をかけません＝実際の受取画面の挙動と一致）。②「入金額＋①の手取り分」の合計に、売却税1%をかけます（PROを売却する際は元本相当分も含めた全体に税がかかるため）。<br>
       ※ <strong>運用元本</strong> = 初期入金額 × 1.25（固定倍率）。この運用元本に対してリベース率（%/12時間）で複利計算しています：運用元本 ×（1+リベース率）^(2×経過日数)。<br>
       ※ <strong>ランク報酬スケジュール</strong>：「この日からVランク」という行を複数追加でき、日数の区間ごとに違うランクのボーナス（+15%〜+155%）を複利計算に反映できます。将来ランクが上がっていく想定を織り込みたい場合に使ってください。公式資料の計算式「日次収益 × (1 + 招待報酬 + Vランク報酬)」のうち、Vランク分のみを反映しています（招待報酬10%／5%は①カードで自分の実際の受取額を入力する運用のため、ここでは二重計上を避けて含めていません）。ランク到達には個人アカウント条件・有効紹介人数・社群業績などの条件があり、この設定は「そのスケジュール通りにランクを維持できた場合」の理論値です。
     </div>
@@ -587,8 +587,10 @@ function recalcCard1(){
   document.getElementById('totalUsd').textContent = "≈ " + fmtUSD(total / fx);
 }
 
-// 実際のリリースプール画面で確認された段階（7日=15%は実受取で確認済み。30日=5%/45日=1%は運営資料ベースで未確認。15日はデータなしのため7日〜30日の間で線形補間）に、売却税相当1%を一律で織り込み済み
-const RELEASE_TAX_ANCHORS = [[7,0.16],[30,0.06],[45,0.02]];
+// 実際のリリースプール画面で確認された段階（7日=15%は実受取で確認済み。30日=5%/45日=1%は運営資料ベースで未確認。15日はデータなしのため7日〜30日の間で線形補間）。この税率は「引き出し可能なPRO（＝含み益部分）」に対してのみかかる（実際の受取画面 0.856/1.007129 PRO の挙動と一致）
+const RELEASE_TAX_ANCHORS = [[7,0.15],[30,0.05],[45,0.01]];
+// 売却税：PROをUSDT等に売却する際、元本相当分も含めた合計に対してかかる（別枠）
+const SELL_TAX = 0.01;
 function releaseTaxFor(days){
   const d = Math.min(Math.max(days, RELEASE_TAX_ANCHORS[0][0]), RELEASE_TAX_ANCHORS[RELEASE_TAX_ANCHORS.length-1][0]);
   for(let i=0;i<RELEASE_TAX_ANCHORS.length-1;i++){
@@ -726,7 +728,8 @@ function recalcCard2(){
 
   function netFromBalance(balance, taxRate){
     const gain = Math.max(balance - principal, 0);
-    return principal + gain * (1 - taxRate);
+    const afterReleaseTax = principal + gain * (1 - taxRate);
+    return afterReleaseTax * (1 - SELL_TAX);
   }
 
   const maxTableDays = Math.min(Math.max(simDays,30), 730);
@@ -760,7 +763,7 @@ function recalcCard2(){
     document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、この設定（成長率・税率）では10年経っても手取りが上回りません。レート設定を見直してください。`;
   } else {
     document.getElementById('breakevenHeadline').textContent = fmtDaysSpan(breakevenDay);
-    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、リリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（税率${(releaseTax*100).toFixed(0)}%・売却税1%込み）の設定で、手取りが上回る見込みの日数です。`;
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、リリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（含み益に出金税${(releaseTax*100).toFixed(0)}%）＋売却時に合計額へ売却税${(SELL_TAX*100).toFixed(0)}%、の2段階を差し引いた場合に手取りが上回る見込みの日数です。`;
   }
 
   const beTbody = document.getElementById('breakevenTableBody');
