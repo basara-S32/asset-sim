@@ -143,9 +143,45 @@
     .tab-bar{flex-direction:column;gap:6px;padding:5px;}
     .tab-btn{font-size:12.5px;padding:12px 10px;}
   }
+
+  #passGate{
+    position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+    padding:20px;
+    background:
+      radial-gradient(circle at 10% 0%, var(--bg1) 0%, transparent 45%),
+      radial-gradient(circle at 90% 10%, var(--bg3) 0%, transparent 45%),
+      linear-gradient(160deg, var(--bg2), #fff8f0 60%, var(--bg1));
+  }
+  #passGate.hidden{display:none;}
+  .gate-card{
+    background:#fff;border:1px solid var(--border);border-radius:22px;padding:32px 28px;
+    max-width:340px;width:100%;box-shadow:0 14px 40px rgba(124,92,255,0.16);text-align:center;
+  }
+  .gate-card .lock-emoji{font-size:38px;margin-bottom:10px;}
+  .gate-card h2{font-size:17px;margin:0 0 6px;color:var(--text);}
+  .gate-card p{font-size:12.5px;color:var(--sub);margin:0 0 18px;line-height:1.6;}
+  .gate-card input[type=password]{
+    width:100%;padding:12px 14px;background:var(--input-bg);border:2px solid var(--border);
+    border-radius:12px;color:var(--text);font-size:16px;text-align:center;letter-spacing:2px;
+    margin-bottom:12px;
+  }
+  .gate-card input[type=password]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,0.15);}
+  .gate-card .gate-error{color:var(--danger);font-size:12px;min-height:16px;margin-bottom:8px;font-weight:700;}
 </style>
 </head>
 <body>
+
+<div id="passGate">
+  <div class="gate-card">
+    <div class="lock-emoji">🔒</div>
+    <h2>パスワードが必要です</h2>
+    <p>このページを見るにはパスワードを入力してください。</p>
+    <div class="gate-error" id="gateError"></div>
+    <input type="password" id="gatePasswordInput" placeholder="パスワード" autocomplete="off">
+    <button class="btn" id="gateSubmitBtn" type="button">開く</button>
+  </div>
+</div>
+
 <div class="wrap">
   <h1>🚀 Crypto DAO 資産運用シミュレーター <span class="badge">✨ 個人用・自己計算ツール</span></h1>
   <div class="subtitle">自分のステーク状況から見込み月利を計算し、複利再投資した場合の中長期の推移を試算します。</div>
@@ -984,12 +1020,6 @@ renderLog();
 
 // ============ タブ切り替え（簡易版／詳細版） ============
 const TAB_KEY = 'cdao_sim_active_tab_v1';
-const DETAIL_UNLOCK_KEY = 'cdao_sim_detail_unlocked_v1';
-const DETAIL_PASSWORD = 'daonimanima';
-
-function isDetailUnlocked(){
-  return localStorage.getItem(DETAIL_UNLOCK_KEY) === '1';
-}
 
 function setActiveTab(tab){
   const isSimple = tab === 'simple';
@@ -1001,20 +1031,31 @@ function setActiveTab(tab){
 }
 
 document.getElementById('tabBtnSimple').addEventListener('click', () => setActiveTab('simple'));
-document.getElementById('tabBtnDetail').addEventListener('click', () => {
-  if(isDetailUnlocked()){
-    setActiveTab('detail');
-    return;
+document.getElementById('tabBtnDetail').addEventListener('click', () => setActiveTab('detail'));
+setActiveTab(localStorage.getItem(TAB_KEY) === 'detail' ? 'detail' : 'simple');
+
+// ============ ページ全体のパスワードゲート ============
+const PAGE_UNLOCK_KEY = 'cdao_sim_page_unlocked_v1';
+const PAGE_PASSWORD = 'daonimanima';
+
+function tryUnlockGate(){
+  const val = document.getElementById('gatePasswordInput').value;
+  if(val === PAGE_PASSWORD){
+    localStorage.setItem(PAGE_UNLOCK_KEY, '1');
+    document.getElementById('passGate').classList.add('hidden');
+  } else {
+    document.getElementById('gateError').textContent = 'パスワードが違います。';
   }
-  const input = window.prompt('詳細版を見るにはパスワードを入力してください');
-  if(input === DETAIL_PASSWORD){
-    localStorage.setItem(DETAIL_UNLOCK_KEY, '1');
-    setActiveTab('detail');
-  } else if(input !== null){
-    window.alert('パスワードが違います。');
-  }
+}
+document.getElementById('gateSubmitBtn').addEventListener('click', tryUnlockGate);
+document.getElementById('gatePasswordInput').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') tryUnlockGate();
 });
-setActiveTab((localStorage.getItem(TAB_KEY) === 'detail' && isDetailUnlocked()) ? 'detail' : 'simple');
+if(localStorage.getItem(PAGE_UNLOCK_KEY) === '1'){
+  document.getElementById('passGate').classList.add('hidden');
+} else {
+  document.getElementById('gatePasswordInput').focus();
+}
 </script>
 </body>
 </html>
