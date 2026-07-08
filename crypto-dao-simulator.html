@@ -853,7 +853,8 @@ function recalcCard2(){
       const grownRemainder = remainderGrossAtBreakeven * growthSinceBreakeven;
       return principal + grownRemainder;
     }
-    if(reinvestStyle === 'full'){
+    if(reinvestStyle === 'full' || reinvestStyle === 'recover'){
+      // 元本回収型でも回収日まで（＝まだ何も引き出していない間）は全額再投資と全く同じ低摩擦モデル
       return balanceAtDayClaimTaxed(days, taxRate);
     }
     return netFromDay(days, taxRate);
