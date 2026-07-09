@@ -702,13 +702,21 @@ function renderRankRefTable(){
 }
 renderRankRefTable();
 
+// V7以上は「直紹介10アカウント」「組織条件（2名がV6以上、など）」というダウンライン実績が必要で、
+// 金額だけで到達できる人はかなり少ないため、金額からの逆引き表示は全てV6（+65%）で頭打ちにする
+const AUTO_RANK_CAP = 0.65;
+function capRankAtV6(matched){
+  if(!matched) return null;
+  return matched.bonus > AUTO_RANK_CAP ? RANK_TABLE.find(r => r.rank === 'V6') : matched;
+}
+
 // 月換算の金額(USD)から、公式ランク表の「最低月収」を満たす最高ランクを探す（あくまで金額の目安の照合であり、直紹介・組織条件を満たしているとは限らない）
 function findRankForMonthlyUSD(usd){
   let matched = null;
   for(const r of RANK_TABLE){
     if(usd >= r.minUsd) matched = r; else break;
   }
-  return matched;
+  return capRankAtV6(matched);
 }
 
 // 残高（税引前）が公式ランク表の「組織売上条件」を超えたら、そのランク以上とみなす（実際は個人の残高ではなくダウンライン全体の売上条件だが、規模感の目安として代用）
@@ -717,14 +725,11 @@ function findRankForBalance(balance){
   for(const r of RANK_TABLE){
     if(balance >= r.sales) matched = r; else break;
   }
-  return matched;
+  return capRankAtV6(matched);
 }
 
-// V7以上は「10アカウント直紹介」「組織条件（2名がV6以上を達成、など）」が必要で、残高だけでは到達できる人がかなり少ないため、
-// 「自動」モードでの昇格シミュレーションはV6（+65%）で頭打ちにする
-const AUTO_RANK_CAP = 0.65;
-
 // 「自動」モード用：残高が組織売上条件を超えるたびにランクが上がっていく前提で、日次シミュレーションから昇格スケジュール（segments形式）を組み立てる
+// （AUTO_RANK_CAPは上のcapRankAtV6と共通のV6頭打ち設定を使用）
 function buildAutoRankSegments(workingPrincipal, rebaseRate, maxDays){
   const segments = [{day: 0, rank: 0}];
   let balance = workingPrincipal;
