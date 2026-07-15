@@ -376,6 +376,35 @@
       ※ <strong>運用スタイル</strong>：「全額再投資」は現金化を考えず、増えた分から出金税（claim税）だけ引いてそのままPROで再投資し続ける前提です（USDTに売らないので売却税・ボンド解放スケジュールは関係なく、「手取り想定」欄はほぼ「税引き後もそのまま複利で回っている場合の評価額」になります）。「元本回収型」は、元本回収日（上の「元本回収の目安」の日数、こちらは実際に現金化する場合の税・ボンド解放スケジュールを織り込んだ計算）までは全額再投資と同じ動きをし、回収日に「税引き後ちょうど入金額」を1回だけ引き出します。その時点で解放済みの運用元本と含み益を使い切っている前提なので、残るのは「まだ解放されていなかったボンド元本」部分だけになり、それを以降は全額再投資と同じ低摩擦モデル（都度claim税のみ、売却税やボンド解放スケジュールは以後考慮しない）で複利運用します。何度も売却税・ボンド解放の計算をやり直さない分、全額再投資の残高カーブに近い伸び方になります。<br>
       ※ <strong>ランク報酬のバーン負担</strong>：ランクが付いている（V1以上の）期間は、その日々の収益は「ランク報酬」として扱われ、利確するには自分の別のPROを1バーンして6Pro分を利確する「入場券」が必要という実際の仕組みを反映しています。実質、利確額の1/6を出金税とは別に追加で失うため、ランク適用中の再投資は「出金税＋1/6」を摩擦として引いています（ランクなし＝V0の期間は出金税のみ）。なお、7日ベスティング後に発生する「タービン」工程（同額のUSDTを一時的に充てる）は翌日に全額返ってくるため、金額には影響させず日数の目安としてのみ捉えています。
     </div>
+
+    <details style="margin-top:16px;">
+      <summary>🔒 隠し機能：ダウンライン込みの総収益試算（自分専用メモ・手入力のみ）</summary>
+      <div class="desc">紹介・登録の仕組みは一切なく、下の階層のメンバーの見込み月収とランクを自分で入力するだけの電卓です。自分より下のランクとの差1つにつき+10%が上乗せされ、同ランク以下だと上乗せは0になる、という条件で計算します。</div>
+
+      <div class="grid" style="max-width:220px;">
+        <div class="field">
+          <label>自分の現在のランク</label>
+          <select id="myRankSelect"></select>
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table id="downlineTable" style="margin-top:12px;">
+          <thead><tr><th style="text-align:left;">メモ</th><th>月間収益見込み(USD)</th><th style="text-align:left;">ランク</th><th>ランク差</th><th>上乗せ収益</th><th></th></tr></thead>
+          <tbody id="downlineBody"></tbody>
+        </table>
+      </div>
+      <button id="addDownlineBtn" type="button" class="btn" style="width:auto;padding:6px 14px;font-size:12.5px;margin-top:8px;">＋ 行を追加</button>
+
+      <div class="total-box" style="margin-top:14px;">
+        <div>
+          <div class="label">自分の基本月収（①の合計見込み月利）＋ダウンライン上乗せ合計</div>
+          <div class="sub-val" id="downlineDetail"></div>
+        </div>
+        <div class="val" id="downlineTotalUsd">$0</div>
+      </div>
+      <div class="footnote">※ 上乗せ収益 = そのメンバーの月間収益見込み × 10% ×（自分のランク番号 − そのメンバーのランク番号、マイナスなら0）。実際の紹介人数条件・組織条件などは考慮していない単純計算です。数値は全てこのブラウザ内にのみ保存されます。</div>
+    </details>
   </div>
 
   <!-- ================= CARD 3: 実績トラッキング ================= -->
@@ -599,6 +628,8 @@ function fmtDaysSpan(d){
   return Math.round(d) + "日（約" + (Math.round(d/365*10)/10) + "年）";
 }
 
+let lastCard1MonthlyUsd = 0;
+
 function recalcCard1(){
   const stakeQty = parseFloat(document.getElementById('stakeQty').value) || 0;
   const bondQty = parseFloat(document.getElementById('bondQty').value) || 0;
@@ -630,6 +661,9 @@ function recalcCard1(){
       ? `🏆 月換算 ${fmtUSD(monthlyUsd)}／月 ＝ ランク表の${matched.rank}（最低月収${fmtUSD(matched.minUsd)}）以上に相当`
       : `月換算 ${fmtUSD(monthlyUsd)}／月 ＝ ランク表のV1未満（最低月収$225）`;
   }
+
+  lastCard1MonthlyUsd = total / fx;
+  if(typeof renderDownline === 'function') renderDownline();
 }
 
 // 実際のリリースプール画面で確認された段階（7日=15%は実受取で確認済み。30日=5%/45日=1%は運営資料ベースで未確認。15日はデータなしのため7日〜30日の間で線形補間）。この税率は「引き出し可能なPRO（＝含み益部分）」に対してのみかかる（実際の受取画面 0.856/1.007129 PRO の挙動と一致）
@@ -820,6 +854,93 @@ document.getElementById('addRankRowBtn').addEventListener('click', () => {
 });
 
 renderRankSchedule();
+
+// ============ 隠し機能：ダウンライン込みの総収益試算（自分専用の手入力メモ） ============
+const RANK_ORDINALS = [{value:0, label:"なし"}].concat(RANK_TABLE.map((r,i) => ({value:i+1, label:r.rank})));
+const DOWNLINE_KEY = 'cdao_sim_downline_v1';
+const MY_RANK_KEY = 'cdao_sim_myrank_v1';
+
+function loadDownline(){
+  try{
+    const raw = localStorage.getItem(DOWNLINE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function saveDownline(entries){
+  localStorage.setItem(DOWNLINE_KEY, JSON.stringify(entries));
+}
+
+const myRankSelectEl = document.getElementById('myRankSelect');
+if(myRankSelectEl){
+  RANK_ORDINALS.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.value;
+    opt.textContent = o.label;
+    myRankSelectEl.appendChild(opt);
+  });
+  const storedMyRank = parseInt(localStorage.getItem(MY_RANK_KEY));
+  myRankSelectEl.value = isFinite(storedMyRank) ? storedMyRank : 0;
+  myRankSelectEl.addEventListener('change', () => {
+    localStorage.setItem(MY_RANK_KEY, myRankSelectEl.value);
+    renderDownline();
+  });
+}
+
+function renderDownline(){
+  const bodyEl = document.getElementById('downlineBody');
+  if(!bodyEl) return;
+  const entries = loadDownline();
+  const myRank = parseInt(myRankSelectEl ? myRankSelectEl.value : 0) || 0;
+
+  bodyEl.innerHTML = "";
+  let upliftTotal = 0;
+  entries.forEach((e, idx) => {
+    const gap = Math.max(myRank - (e.rank || 0), 0);
+    const upliftPct = gap * 10;
+    const upliftIncome = (parseFloat(e.monthlyUsd) || 0) * (upliftPct / 100);
+    upliftTotal += upliftIncome;
+
+    const tr = document.createElement('tr');
+    const noteEsc = (e.note || '').replace(/</g,'&lt;');
+    const rankLabel = RANK_ORDINALS.find(o => o.value === (e.rank||0))?.label || 'なし';
+    tr.innerHTML = `<td style="text-align:left;">${noteEsc}</td><td>${fmtUSD(e.monthlyUsd||0)}</td><td style="text-align:left;">${rankLabel}</td><td>${gap}</td><td style="font-weight:700;color:var(--accent2);">${fmtUSD(upliftIncome)}</td><td></td>`;
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-del';
+    delBtn.textContent = '削除';
+    delBtn.addEventListener('click', () => {
+      const all = loadDownline();
+      all.splice(idx, 1);
+      saveDownline(all);
+      renderDownline();
+    });
+    tr.lastElementChild.appendChild(delBtn);
+    bodyEl.appendChild(tr);
+  });
+
+  const totalEl = document.getElementById('downlineTotalUsd');
+  const detailEl = document.getElementById('downlineDetail');
+  if(totalEl){
+    const grandTotal = lastCard1MonthlyUsd + upliftTotal;
+    totalEl.textContent = fmtUSD(grandTotal);
+    if(detailEl) detailEl.textContent = `自分の基本月収 ${fmtUSD(lastCard1MonthlyUsd)} ＋ ダウンライン上乗せ ${fmtUSD(upliftTotal)}（${entries.length}件）`;
+  }
+}
+
+const addDownlineBtn = document.getElementById('addDownlineBtn');
+if(addDownlineBtn){
+  addDownlineBtn.addEventListener('click', () => {
+    const note = prompt('メモ（任意、例：Aさん）') || '';
+    const monthlyUsd = parseFloat(prompt('そのメンバーの月間収益見込み(USD)') || '0') || 0;
+    const rankInput = prompt('そのメンバーのランク番号（0=なし、1=V1 ... 15=V15）') || '0';
+    const rank = Math.min(Math.max(parseInt(rankInput) || 0, 0), 15);
+    const entries = loadDownline();
+    entries.push({note, monthlyUsd, rank});
+    saveDownline(entries);
+    renderDownline();
+  });
+}
+
+renderDownline();
 
 function recalcCard2(){
   const principal = parseFloat(document.getElementById('principal').value) || 0;
