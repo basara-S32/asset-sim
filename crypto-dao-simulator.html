@@ -904,9 +904,11 @@ if(myRankSelectEl){
   myRankSelectEl.value = isFinite(storedMyRank) ? storedMyRank : 0;
   myRankSelectEl.addEventListener('change', () => {
     localStorage.setItem(MY_RANK_KEY, myRankSelectEl.value);
-    renderDownline();
+    recalcAll();
   });
 }
+
+let lastDownlineMonthlyUplift = 0;
 
 function renderDownline(){
   const bodyEl = document.getElementById('downlineBody');
@@ -933,18 +935,20 @@ function renderDownline(){
       const all = loadDownline();
       all.splice(idx, 1);
       saveDownline(all);
-      renderDownline();
+      recalcAll();
     });
     tr.lastElementChild.appendChild(delBtn);
     bodyEl.appendChild(tr);
   });
+
+  lastDownlineMonthlyUplift = upliftTotal;
 
   const totalEl = document.getElementById('downlineTotalUsd');
   const detailEl = document.getElementById('downlineDetail');
   if(totalEl){
     const grandTotal = lastCard1MonthlyUsd + upliftTotal;
     totalEl.textContent = fmtUSD(grandTotal);
-    if(detailEl) detailEl.textContent = `自分の基本月収 ${fmtUSD(lastCard1MonthlyUsd)} ＋ ダウンライン上乗せ ${fmtUSD(upliftTotal)}（${entries.length}件）`;
+    if(detailEl) detailEl.textContent = `自分の基本月収 ${fmtUSD(lastCard1MonthlyUsd)} ＋ ダウンライン上乗せ ${fmtUSD(upliftTotal)}（${entries.length}件）。②のシミュレーションにも月換算で上乗せ済みです。`;
   }
 }
 
@@ -958,7 +962,7 @@ if(addDownlineBtn){
     const entries = loadDownline();
     entries.push({note, monthlyUsd, rank});
     saveDownline(entries);
-    renderDownline();
+    recalcAll();
   });
 }
 
@@ -1037,9 +1041,12 @@ function recalcCard2(){
     return principalCash + gainCash;
   }
 
+  // ダウンライン込みの月収（隠し機能で入力した上乗せ分）を、経過日数に応じて累積で上乗せする
+  const downlineCumulativeAtDay = days => lastDownlineMonthlyUplift * (days / 30);
+
   // 元本回収（現在の設定）※スタイルに関わらず「回収するまでの日数」は共通（全額再投資型と同じ計算）
   const MAX_SEARCH_DAYS = 3650;
-  const breakevenDay = findBreakevenDay(d => netFromDay(d, releaseTax), principal, MAX_SEARCH_DAYS);
+  const breakevenDay = findBreakevenDay(d => netFromDay(d, releaseTax) + downlineCumulativeAtDay(d), principal, MAX_SEARCH_DAYS);
 
   const reinvestStyle = document.getElementById('reinvestStyle').value;
   // 回収日に「税引き後ちょうど入金額」を1回だけ引き出す。その時点で「解放済みの運用元本」＋「その日までの含み益」の
@@ -1082,7 +1089,7 @@ function recalcCard2(){
 
   const rows = checkpoints.map(days => {
     const balance = balanceStyled(days);
-    const net = netStyled(days, releaseTax);
+    const net = netStyled(days, releaseTax) + downlineCumulativeAtDay(days);
     const netJpy = net * fx;
     return {days, balance, net, netJpy};
   });
@@ -1112,19 +1119,20 @@ function recalcCard2(){
 
   const releaseLabelMap = {7:"7日",15:"15日",30:"30日",45:"45日"};
   const styleNote = reinvestStyle === 'recover' ? "（回収日以降は元本を確保し、含み益部分だけ複利継続の前提）" : "（全額を回収日以降もずっと複利継続）";
+  const downlineNote = lastDownlineMonthlyUplift > 0 ? `（隠し機能のダウンライン上乗せ月収 ${fmtUSD(lastDownlineMonthlyUplift)} も月換算で加算済み）` : "";
   if(breakevenDay == null){
     document.getElementById('breakevenHeadline').textContent = "10年以内に回収できません";
     document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、この設定（成長率・税率・ボンド期間）では10年経っても手取りが上回りません。レート設定を見直してください。`;
   } else {
     document.getElementById('breakevenHeadline').textContent = fmtDaysSpan(breakevenDay);
-    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、①運用元本(${fmtUSD(workingPrincipal)})がボンド期間${bondTermDays}日で線形に解放され、②含み益はリリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（出金税${(releaseTax*100).toFixed(0)}%）ですぐ引き出せる、という前提で、売却税${(SELL_TAX*100).toFixed(0)}%を差し引いた手取りが入金額を上回る見込みの日数です${styleNote}。`;
+    document.getElementById('breakevenDetail').textContent = `入金額 ${fmtUSD(principal)} に対して、①運用元本(${fmtUSD(workingPrincipal)})がボンド期間${bondTermDays}日で線形に解放され、②含み益はリリース${releaseLabelMap[releaseDays]||releaseDays+'日'}（出金税${(releaseTax*100).toFixed(0)}%）ですぐ引き出せる、という前提で、売却税${(SELL_TAX*100).toFixed(0)}%を差し引いた手取りが入金額を上回る見込みの日数です${styleNote}${downlineNote}。`;
   }
 
   const beTbody = document.getElementById('breakevenTableBody');
   beTbody.innerHTML = "";
   [7,15,30,45].forEach(rd => {
     const rt = releaseTaxFor(rd);
-    const be = findBreakevenDay(d => netFromDay(d, rt), principal, MAX_SEARCH_DAYS);
+    const be = findBreakevenDay(d => netFromDay(d, rt) + downlineCumulativeAtDay(d), principal, MAX_SEARCH_DAYS);
     const tr = document.createElement('tr');
     const beLabel = be == null ? "10年以内に回収不可" : fmtDaysSpan(be);
     const isCurrent = rd === releaseDays;
