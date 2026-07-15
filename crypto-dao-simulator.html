@@ -377,8 +377,8 @@
       ※ <strong>ランク報酬のバーン負担</strong>：ランクが付いている（V1以上の）期間は、その日々の収益は「ランク報酬」として扱われ、利確するには自分の別のPROを1バーンして6Pro分を利確する「入場券」が必要という実際の仕組みを反映しています。実質、利確額の1/6を出金税とは別に追加で失うため、ランク適用中の再投資は「出金税＋1/6」を摩擦として引いています（ランクなし＝V0の期間は出金税のみ）。なお、7日ベスティング後に発生する「タービン」工程（同額のUSDTを一時的に充てる）は翌日に全額返ってくるため、金額には影響させず日数の目安としてのみ捉えています。
     </div>
 
-    <details style="margin-top:16px;">
-      <summary>🔒 隠し機能：ダウンライン込みの総収益試算（自分専用メモ・手入力のみ）</summary>
+    <details style="margin-top:16px;" id="downlineDetails">
+      <summary id="downlineSummary">🔒 隠し機能：ダウンライン込みの総収益試算（自分専用メモ・手入力のみ）</summary>
       <div class="desc">紹介・登録の仕組みは一切なく、下の階層のメンバーの見込み月収とランクを自分で入力するだけの電卓です。自分より下のランクとの差1つにつき+10%が上乗せされ、同ランク以下だと上乗せは0になる、という条件で計算します。</div>
 
       <div class="grid" style="max-width:220px;">
@@ -859,6 +859,28 @@ renderRankSchedule();
 const RANK_ORDINALS = [{value:0, label:"なし"}].concat(RANK_TABLE.map((r,i) => ({value:i+1, label:r.rank})));
 const DOWNLINE_KEY = 'cdao_sim_downline_v1';
 const MY_RANK_KEY = 'cdao_sim_myrank_v1';
+const DOWNLINE_UNLOCK_KEY = 'cdao_sim_downline_unlocked_v1';
+const DOWNLINE_PASSWORD = 'daowakuwaku';
+
+function isDownlineUnlocked(){
+  return localStorage.getItem(DOWNLINE_UNLOCK_KEY) === '1';
+}
+
+const downlineDetailsEl = document.getElementById('downlineDetails');
+const downlineSummaryEl = document.getElementById('downlineSummary');
+if(downlineSummaryEl && downlineDetailsEl){
+  downlineSummaryEl.addEventListener('click', (e) => {
+    if(isDownlineUnlocked()) return; // 解除済みなら通常通り開閉させる
+    e.preventDefault();
+    const input = window.prompt('この機能を見るにはパスワードを入力してください');
+    if(input === DOWNLINE_PASSWORD){
+      localStorage.setItem(DOWNLINE_UNLOCK_KEY, '1');
+      downlineDetailsEl.open = true;
+    } else if(input !== null){
+      window.alert('パスワードが違います。');
+    }
+  });
+}
 
 function loadDownline(){
   try{
