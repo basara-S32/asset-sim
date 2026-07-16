@@ -390,7 +390,7 @@
 
       <div class="table-scroll">
         <table id="downlineTable" style="margin-top:12px;">
-          <thead><tr><th style="text-align:left;">メモ</th><th>月間収益見込み(USD)</th><th style="text-align:left;">ランク</th><th>ランク差</th><th>上乗せ収益</th><th></th></tr></thead>
+          <thead><tr><th style="text-align:left;">メモ</th><th>月間収益見込み(USD)</th><th style="text-align:left;">ランク</th><th>上乗せ率</th><th>上乗せ収益</th><th></th></tr></thead>
           <tbody id="downlineBody"></tbody>
         </table>
       </div>
@@ -403,7 +403,7 @@
         </div>
         <div class="val" id="downlineTotalUsd">$0</div>
       </div>
-      <div class="footnote">※ 上乗せ収益 = そのメンバーの月間収益見込み × 10% ×（自分のランク番号 − そのメンバーのランク番号、マイナスなら0）。実際の紹介人数条件・組織条件などは考慮していない単純計算です。数値は全てこのブラウザ内にのみ保存されます。</div>
+      <div class="footnote">※ 上乗せ率 = 自分のボーナス比率（ランク早見表の%、なし=0%）− そのメンバーのボーナス比率（同、なし=0%）、マイナスなら0%。上乗せ収益 = そのメンバーの月間収益見込み × 上乗せ率。同ランク以下なら上乗せ0、相手がランクなしなら自分のボーナス比率をまるごと受け取ります。実際の紹介人数条件・組織条件などは考慮していない単純計算です。数値は全てこのブラウザ内にのみ保存されます。</div>
     </details>
   </div>
 
@@ -910,24 +910,32 @@ if(myRankSelectEl){
 
 let lastDownlineMonthlyUplift = 0;
 
+// V0（なし）は0%、V1〜V15は公式ランク表のボーナス比率（15%〜155%）をそのまま使う
+function pctForRankOrdinal(ordinal){
+  if(!ordinal || ordinal <= 0) return 0;
+  const entry = RANK_TABLE[ordinal - 1];
+  return entry ? entry.bonus * 100 : 0;
+}
+
 function renderDownline(){
   const bodyEl = document.getElementById('downlineBody');
   if(!bodyEl) return;
   const entries = loadDownline();
   const myRank = parseInt(myRankSelectEl ? myRankSelectEl.value : 0) || 0;
+  const myPct = pctForRankOrdinal(myRank);
 
   bodyEl.innerHTML = "";
   let upliftTotal = 0;
   entries.forEach((e, idx) => {
-    const gap = Math.max(myRank - (e.rank || 0), 0);
-    const upliftPct = gap * 10;
+    const downlinePct = pctForRankOrdinal(e.rank || 0);
+    const upliftPct = Math.max(myPct - downlinePct, 0);
     const upliftIncome = (parseFloat(e.monthlyUsd) || 0) * (upliftPct / 100);
     upliftTotal += upliftIncome;
 
     const tr = document.createElement('tr');
     const noteEsc = (e.note || '').replace(/</g,'&lt;');
     const rankLabel = RANK_ORDINALS.find(o => o.value === (e.rank||0))?.label || 'なし';
-    tr.innerHTML = `<td style="text-align:left;">${noteEsc}</td><td>${fmtUSD(e.monthlyUsd||0)}</td><td style="text-align:left;">${rankLabel}</td><td>${gap}</td><td style="font-weight:700;color:var(--accent2);">${fmtUSD(upliftIncome)}</td><td></td>`;
+    tr.innerHTML = `<td style="text-align:left;">${noteEsc}</td><td>${fmtUSD(e.monthlyUsd||0)}</td><td style="text-align:left;">${rankLabel}</td><td>${upliftPct.toFixed(0)}%</td><td style="font-weight:700;color:var(--accent2);">${fmtUSD(upliftIncome)}</td><td></td>`;
     const delBtn = document.createElement('button');
     delBtn.className = 'btn-del';
     delBtn.textContent = '削除';
